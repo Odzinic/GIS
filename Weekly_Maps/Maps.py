@@ -75,8 +75,7 @@ for lyr in arcm.ListLayers(mxd):
     
     
     
-    
-
+    ""
 
 
 '''Change the week number and date'''
