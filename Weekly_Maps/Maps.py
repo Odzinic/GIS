@@ -30,7 +30,10 @@ print "Input template is {0}".format(in_template)
 copyfile(os.path.join(template_dir, in_template), os.path.join(out_dir, in_template))
 mxd = arcpy.mapping.MapDocument(os.path.join(out_dir, in_template))
 
-testDframe = arcm.ListDataFrames(mxd)[0]
+listDframe = arcm.ListDataFrames(mxd)
+for frame in listDframe:
+    if (frame.name == "Climate Map"):
+        testDframe = frame
 
 projection = "PROJCS['North_America_Lambert_Conformal_Conic',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Lambert_Conformal_Conic'],PARAMETER['False_Easting',0.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',-96.0],PARAMETER['Standard_Parallel_1',20.0],PARAMETER['Standard_Parallel_2',60.0],PARAMETER['Latitude_Of_Origin',40.0],UNIT['Meter',1.0]]"
 inproj = "GEOGCS['GCS_WGS_1984',DATUM['D_WGS_1984',SPHEROID['WGS_1984',6378137.0,298.257223563]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]]"
@@ -67,15 +70,14 @@ for lyr in arcm.ListLayers(mxd):
     print lyr.dataSource
     arcm.RemoveLayer(testDframe, lyr)
     if ((lyr.dataSource).endswith(".tif")):
-        lyr.replaceDataSource(vector_dir, "RASTER_WORKSPACE", name)
+        lyr.replaceDataSource(vector_dir, "RASTER_WORKSPACE", "temp.tif")
     else:
         lyr.replaceDataSource(vector_dir, "SHAPEFILE_WORKSPACE", name)
     arcm.AddLayer(testDframe, lyr, "AUTO_ARRANGE")
     print lyr.dataSource
     
     
-    
-    ""
+
 
 
 '''Change the week number and date'''
@@ -90,11 +92,14 @@ def iso_to_gregorian(iso_year, iso_week, iso_day):
     year_start = iso_year_start(iso_year)
     return year_start + datetime.timedelta(days=iso_day-1, weeks=iso_week-1)
 
-date = str(iso_to_gregorian(2013, 23, 2)).split("-")
-yearNum = int(date[0])
+weekNum = int(fname.split("_")[6][0:2])
+yearNum = int(fname.split("_")[4])
+date = str(iso_to_gregorian(yearNum, weekNum, 1)).split("-")
+
 monthNum = int(date[1])
 dayNum = int(date[2])
-weekNum = fname.split("_")[6][0:2]
+
+
 
 print yearNum
 print monthNum
@@ -103,7 +108,9 @@ print weekNum
 
 for txt in arcpy.mapping.ListLayoutElements(mxd, "TEXT_ELEMENT"):
     if txt.name == "Week Info":
-        txt.text = "Week {0} ({1} {2} - {1} {3}), {4} / Sesmaine {0} ({5} {6} au {5} {7}), {4}".format(weekNum, englishMonth[monthNum - 1], dayNum, dayNum + 6, yearNum, frenchMonth[monthNum - 1], dayNum, dayNum + 6)
+        txt.text = "Week {0} ({1} {2} - {1} {3}), {4} / Semaine {0} ({5} {6} au {5} {7}), {4}".format(weekNum, englishMonth[monthNum - 1], 
+                                                                                                       dayNum, dayNum + 6, yearNum, frenchMonth[monthNum - 1], 
+                                                                                                       dayNum, dayNum + 6)
 
 mxd.save()
 print os.path.join(out_dir, "Map.pdf")
