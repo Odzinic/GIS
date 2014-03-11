@@ -39,7 +39,7 @@ temp_image = None
 total_time = 0.0
 
 
-''
+
 
 def timeReset():
     start_time = 0.0
