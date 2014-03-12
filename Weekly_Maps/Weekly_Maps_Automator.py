@@ -6,7 +6,6 @@ March 11, 2014
 
 '''
 
-''
 
 '''Imports'''
 import arcpy 
@@ -14,8 +13,8 @@ import arcpy.mapping as arcm
 import os
 from shutil import copyfile
 import datetime
+import re
 
-''
 
 
 '''Directories'''
@@ -48,18 +47,17 @@ for frame in listDframe:                                                        
     if (frame.name == "Climate Map"):                                                   # Map data frame
         testDframe = frame
 
-projection = "PROJCS['North_America_Lambert_Conformal_Conic',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Lambert_Conformal_Conic'],PARAMETER['False_Easting',0.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',-96.0],PARAMETER['Standard_Parallel_1',20.0],PARAMETER['Standard_Parallel_2',60.0],PARAMETER['Latitude_Of_Origin',40.0],UNIT['Meter',1.0]]"
-inproj = "GEOGCS['GCS_WGS_1984',DATUM['D_WGS_1984',SPHEROID['WGS_1984',6378137.0,298.257223563]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]]"
-
 tiffInput = os.path.join(img_dir, str(os.listdir(img_dir)[0]))                          # The input tiff image
 tiffOutput = os.path.join(vector_dir, "temp.tif")                                       # The path to the temp copy of the tiff image
 
 
-englishMonth = ['January', 'February', 'March', 'April', 'May', 'June', 'July',         # List of months
+englishMonth = ['January', 'February', 'March', 'April', 'May', 'June', 'July', # List of months
                 'August', 'September', 'October', 'November', 'December']               # in English for date
                                                                                                                                           
-frenchMonth = ['janvier', 'f�vrier', 'mars', 'avril', 'mai', 'juin', 'juillet',          # List of months
+frenchMonth = ['janvier', 'f�vrier', 'mars', 'avril', 'mai', 'juin', 'juillet', # List of months
                'ao�t', 'septembre', 'octobre', 'novembre', 'd�cembre']                   # in French for date
+
+totalDays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]                            # List of total days for every month
 
 
 
@@ -69,6 +67,12 @@ copyfile(tiffInput, tiffOutput)                                                 
 
 
 '''Reproject tiff'''
+# Projects a raster to a specific coordinate system. 
+
+# NOTE: Disabled by default. Can be uncommented and used. Change the
+# projection variable to what the output coordinate system should be
+# and inproj to what the current projection is
+
 #if os.path.exists(tiffOutput):
 #    os.remove(tiffOutput)
 #
@@ -113,6 +117,12 @@ for lyr in arcm.ListLayers(mxd):                                                
 
 print "Changing date information"
 
+splitFname = fname.split("_")
+yearNum = int(splitFname[4])                                                            # Extracts the year number from the image name
+for txt in arcpy.mapping.ListLayoutElements(mxd, "TEXT_ELEMENT"):
+    if txt.name == "Week Info":
+        dateText = txt
+
 def iso_year_start(iso_year):                                                           # The Gregorian calendar date of the first day of the given ISO year
     fourth_jan = datetime.date(iso_year, 1, 4)
     delta = datetime.timedelta(fourth_jan.isoweekday() - 1)
@@ -122,23 +132,57 @@ def iso_to_gregorian(iso_year, iso_week, iso_day):                              
     year_start = iso_year_start(iso_year)
     return year_start + datetime.timedelta(days=iso_day - 1, weeks=iso_week - 1)
 
-weekNum = int(fname.split("_")[6][0:2])                                                 # Extracts the week number from the image name
-yearNum = int(fname.split("_")[4])                                                      # Extracts the year number from the image name
 
-date = str(iso_to_gregorian(yearNum, weekNum, 1)).split("-")                            # Calculates the Gregorian date and receives a string containing the
+# Date modifier for monthly maps
+if (splitFname[5] == "Month"):
+    if (re.search('[a-zA-Z]', splitFname[6][0:2])):
+        monthNum = int(splitFname[6][0:1])
+    else:
+        monthNum = int(splitFname[6][0:2])
+    dateText.text = "{0} 1 - {1}, {2} / 1 - {1} {3}, {2}".format(englishMonth[monthNum - 1], totalDays[monthNum - 1],
+                                                            yearNum, frenchMonth[monthNum - 1])
+        
+# Date modifier for bi-weekly maps
+elif (splitFname[5] == "Bi-week"):
+    if (re.search('[a-zA-Z]', splitFname[6][0:2])):
+        weekNum = int(splitFname[6][0:1])
+    else:
+        weekNum = int(splitFname[6][0:2])
+    
+    firstDate = str(iso_to_gregorian(yearNum, weekNum, 1)).split("-")
+    endDate = str(iso_to_gregorian(yearNum, weekNum + 1, 1)).split("-")
+    
+    if((int(endDate[2]) + 6) > totalDays[int(endDate[1])-1]):
+        firstMonth = int(firstDate[1]) - 1
+        firstDay = int(firstDate[2])
+        endMonth = int(endDate[1])
+        endDay = (int(endDate[2]) + 6) - totalDays[int(endDate[1]) + 1]
+    else:
+        firstMonth = int(firstDate[1]) - 1
+        firstDay = int(firstDate[2])
+        endMonth = int(endDate[1]) - 1
+        endDay = int(endDate[2]) + 6
+    
+    dateText.text = "Week {0} and {1} ({2} {3} - {4} {5}), {6} / Semaine {0} et {1} ({3} {7} ae {5} {8}), {6}".format(weekNum, weekNum + 1, 
+                                                                                                                      englishMonth[firstMonth], 
+                                                                                                                      firstDay, englishMonth[endMonth], 
+                                                                                                                      endDay, yearNum, frenchMonth[firstMonth],
+                                                                                                                      frenchMonth[endMonth])
+ 
+# Date modifier for weekly maps
+elif (splitFname[5] == "Week"):
+    weekNum = int(splitFname[6][0:2])                                                   # Extracts the week number from the image name
+    date = str(iso_to_gregorian(yearNum, weekNum, 1)).split("-")                        # Calculates the Gregorian date and receives a string containing the
                                                                                         # date in format YYYY-MM-DD then splits the string into a list of the
                                                                                         # three date values
 
-monthNum = int(date[1])                                                                 # Extracts month number from the list of date values (date)
-dayNum = int(date[2])                                                                   # Extracts day number from the list of date values (date)
+    monthNum = int(date[1])                                                             # Extracts month number from the list of date values (date)
+    dayNum = int(date[2])                                                               # Extracts day number from the list of date values (date)
 
+    dateText.text = "Week {0} ({1} {2} - {1} {3}), {4} / Semaine {0} ({5} {6} au {5} {7}), {4}".format(weekNum, englishMonth[monthNum - 1],
+                                                                                              dayNum, dayNum + 6, yearNum, frenchMonth[monthNum - 1],
+                                                                                              dayNum, dayNum + 6)
 
-
-for txt in arcpy.mapping.ListLayoutElements(mxd, "TEXT_ELEMENT"):
-    if txt.name == "Week Info":
-        txt.text = "Week {0} ({1} {2} - {1} {3}), {4} / Semaine {0} ({5} {6} au {5} {7}), {4}".format(weekNum, englishMonth[monthNum - 1],
-                                                                                                       dayNum, dayNum + 6, yearNum, frenchMonth[monthNum - 1],
-                                                                                                       dayNum, dayNum + 6)
 
 mxd.save()                                                                              # Saves the template copy
 print "Exporting PDF to {0}".format(os.path.join(out_dir, "Map.pdf"))
