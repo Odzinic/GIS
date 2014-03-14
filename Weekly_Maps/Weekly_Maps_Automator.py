@@ -51,11 +51,11 @@ tiffInput = os.path.join(img_dir, str(os.listdir(img_dir)[0]))                  
 tiffOutput = os.path.join(vector_dir, "temp.tif")                                       # The path to the temp copy of the tiff image
 
 
-englishMonth = ['January', 'February', 'March', 'April', 'May', 'June', 'July', # List of months
+englishMonth = ['January', 'February', 'March', 'April', 'May', 'June', 'July',         # List of months
                 'August', 'September', 'October', 'November', 'December']               # in English for date
                                                                                                                                           
-frenchMonth = ['janvier', 'f�vrier', 'mars', 'avril', 'mai', 'juin', 'juillet', # List of months
-               'ao�t', 'septembre', 'octobre', 'novembre', 'd�cembre']                   # in French for date
+frenchMonth = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet',         # List of months
+               'août', 'septembre', 'octobre', 'novembre', 'décembre']                   # in French for date
 
 totalDays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]                            # List of total days for every month
 
@@ -171,7 +171,10 @@ elif (splitFname[5] == "Bi-week"):
  
 # Date modifier for weekly maps
 elif (splitFname[5] == "Week"):
-    weekNum = int(splitFname[6][0:2])                                                   # Extracts the week number from the image name
+    if (re.search('[a-zA-Z]', splitFname[6][0:2])):
+        weekNum = int(splitFname[6][0:1])
+    else:
+        weekNum = int(splitFname[6][0:2])                                               # Extracts the week number from the image name
     date = str(iso_to_gregorian(yearNum, weekNum, 1)).split("-")                        # Calculates the Gregorian date and receives a string containing the
                                                                                         # date in format YYYY-MM-DD then splits the string into a list of the
                                                                                         # three date values
