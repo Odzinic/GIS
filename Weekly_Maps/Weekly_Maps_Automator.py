@@ -28,7 +28,7 @@ if not os.path.exists(os.path.join(main_dir, "Output")):                        
 out_dir = os.path.join(main_dir, "Output")                                              # Directory for output mxd and pdf
 
 
-
+''
 
 '''Constants'''
 in_img = os.listdir(img_dir)[0]
@@ -50,14 +50,21 @@ for frame in listDframe:                                                        
 tiffInput = os.path.join(img_dir, str(os.listdir(img_dir)[0]))                          # The input tiff image
 tiffOutput = os.path.join(vector_dir, "temp.tif")                                       # The path to the temp copy of the tiff image
 
-
 englishMonth = ['January', 'February', 'March', 'April', 'May', 'June', 'July',         # List of months
-                'August', 'September', 'October', 'November', 'December']               # in English for date
-                                                                                                                                          
+                'August', 'September', 'October', 'November', 'December']               # in English for date                                                                                                                                         
+
 frenchMonth = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet',         # List of months
                'août', 'septembre', 'octobre', 'novembre', 'décembre']                   # in French for date
 
 totalDays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]                            # List of total days for every month
+
+monthlyText = "{0} 1 - {1}, {2} / 1 - {1} {3}, {2}"
+biweeklyText = "Week {0} and {1} ({2} {3} - {4} {5}), {6} / Semaine {0} et {1} ({3} {7} au {5} {8}), {6}"
+weeklyText = "Week {0} ({1} {2} - {1} {3}), {4} / Semaine {0} ({5} {6} au {5} {7}), {4}"
+
+monthlyOut = "SMOS_SM_{0}_Month{1}_NorthAmerica.pdf"
+biweeklyOut = "SMOS_SM_{0}_BiWeek{1}-{2}_National.pdf"
+weeklyOut = "SMOS_SM_{0}_Week{1}_25D_National.pdf"
 
 
 
@@ -139,8 +146,10 @@ if (splitFname[5] == "Month"):
         monthNum = int(splitFname[6][0:1])
     else:
         monthNum = int(splitFname[6][0:2])
-    dateText.text = "{0} 1 - {1}, {2} / 1 - {1} {3}, {2}".format(englishMonth[monthNum - 1], totalDays[monthNum - 1],
-                                                            yearNum, frenchMonth[monthNum - 1])
+    dateText.text = monthlyText.format(englishMonth[monthNum - 1], 
+                                       totalDays[monthNum - 1],
+                                       yearNum, frenchMonth[monthNum - 1])
+    fnameOut = monthlyOut.format(yearNum, monthNum)
         
 # Date modifier for bi-weekly maps
 elif (splitFname[5] == "Bi-week"):
@@ -152,7 +161,7 @@ elif (splitFname[5] == "Bi-week"):
     firstDate = str(iso_to_gregorian(yearNum, weekNum, 1)).split("-")
     endDate = str(iso_to_gregorian(yearNum, weekNum + 1, 1)).split("-")
     
-    if((int(endDate[2]) + 6) > totalDays[int(endDate[1])-1]):
+    if((int(endDate[2]) + 6) > totalDays[int(endDate[1]) - 1]):
         firstMonth = int(firstDate[1]) - 1
         firstDay = int(firstDate[2])
         endMonth = int(endDate[1])
@@ -163,11 +172,12 @@ elif (splitFname[5] == "Bi-week"):
         endMonth = int(endDate[1]) - 1
         endDay = int(endDate[2]) + 6
     
-    dateText.text = "Week {0} and {1} ({2} {3} - {4} {5}), {6} / Semaine {0} et {1} ({3} {7} ae {5} {8}), {6}".format(weekNum, weekNum + 1, 
-                                                                                                                      englishMonth[firstMonth], 
-                                                                                                                      firstDay, englishMonth[endMonth], 
-                                                                                                                      endDay, yearNum, frenchMonth[firstMonth],
-                                                                                                                      frenchMonth[endMonth])
+    dateText.text = biweeklyText.format(weekNum, weekNum + 1,
+                                        englishMonth[firstMonth],
+                                        firstDay, englishMonth[endMonth],
+                                        endDay, yearNum, frenchMonth[firstMonth],
+                                        frenchMonth[endMonth])
+    fnameOut = biweeklyOut.format(yearNum, weekNum, weekNum + 1)
  
 # Date modifier for weekly maps
 elif (splitFname[5] == "Week"):
@@ -182,13 +192,15 @@ elif (splitFname[5] == "Week"):
     monthNum = int(date[1])                                                             # Extracts month number from the list of date values (date)
     dayNum = int(date[2])                                                               # Extracts day number from the list of date values (date)
 
-    dateText.text = "Week {0} ({1} {2} - {1} {3}), {4} / Semaine {0} ({5} {6} au {5} {7}), {4}".format(weekNum, englishMonth[monthNum - 1],
-                                                                                              dayNum, dayNum + 6, yearNum, frenchMonth[monthNum - 1],
-                                                                                              dayNum, dayNum + 6)
+    dateText.text = weeklyText.format(weekNum, englishMonth[monthNum - 1],
+                                      dayNum, dayNum + 6, yearNum, 
+                                      frenchMonth[monthNum - 1],
+                                      dayNum, dayNum + 6)
+    fnameOut = weeklyOut.format(yearNum, weekNum)
 
 
 mxd.save()                                                                              # Saves the template copy
-print "Exporting PDF to {0}".format(os.path.join(out_dir, "Map.pdf"))
-arcpy.mapping.ExportToPDF(mxd, os.path.join(out_dir, "Map.pdf"))                        # Exports map to PDF
+print "Exporting PDF to {0}".format(os.path.join(out_dir, fnameOut))
+arcpy.mapping.ExportToPDF(mxd, os.path.join(out_dir, fnameOut))                        # Exports map to PDF
 
 raw_input("Done. Press enter to exit.")
