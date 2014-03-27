@@ -28,7 +28,7 @@ if not os.path.exists(os.path.join(main_dir, "Output")):                        
 out_dir = os.path.join(main_dir, "Output")                                              # Directory for output mxd and pdf
 
 
-''
+
 
 '''Constants'''
 in_img = os.listdir(img_dir)[0]
