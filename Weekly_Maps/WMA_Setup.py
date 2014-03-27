@@ -12,5 +12,5 @@ os.makedirs(os.path.join(main_dir, "Input_Image"))
 os.makedirs(os.path.join(main_dir, "Input_Template"))
 os.makedirs(os.path.join(main_dir, "Input_Vectors"))
 
-copyfile(os.path.join(curr_dir, "Maps.py"), os.path.join(main_dir, "Maps.py"))
+copyfile(os.path.join(curr_dir, "Weekly_Maps_Automator.py"), os.path.join(main_dir, "WMA.py"))
 
