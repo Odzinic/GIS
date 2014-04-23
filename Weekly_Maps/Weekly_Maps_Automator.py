@@ -61,6 +61,7 @@ totalDays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]                    
 monthlyText = "{0} 1 - {1}, {2} / 1 - {1} {3}, {2}"
 biweeklyText = "Week {0} and {1} ({2} {3} - {4} {5}), {6} / Semaine {0} et {1} ({3} {7} au {5} {8}), {6}"
 weeklyText = "Week {0} ({1} {2} - {1} {3}), {4} / Semaine {0} ({5} {6} au {5} {7}), {4}"
+difweeklyText = "Week {0} ({1} {2} - {8} {3}), {4} / Semaine {0} ({5} {6} au {9} {7}), {4}"
 
 monthlyOut = "SMOS_SM_{0}_Month{1}_NorthAmerica.pdf"
 biweeklyOut = "SMOS_SM_{0}_BiWeek{1}-{2}_National.pdf"
@@ -191,16 +192,27 @@ elif (splitFname[5] == "Week"):
 
     monthNum = int(date[1])                                                             # Extracts month number from the list of date values (date)
     dayNum = int(date[2])                                                               # Extracts day number from the list of date values (date)
-
-    dateText.text = weeklyText.format(weekNum, englishMonth[monthNum - 1],
-                                      dayNum, dayNum + 6, yearNum, 
+    
+    if ((dayNum + 6) > totalDays[monthNum - 1]):
+        print "Yes"
+        endMonth = monthNum + 1
+        print englishMonth[endMonth - 1]
+        endDay = (dayNum + 6) - totalDays[monthNum - 1]
+        print endDay
+        
+        dateText.text = difweeklyText.format(weekNum, englishMonth[monthNum - 1],
+                                      dayNum, endDay, yearNum, 
                                       frenchMonth[monthNum - 1],
-                                      dayNum, dayNum + 6)
+                                      dayNum, endDay, englishMonth[endMonth - 1], 
+                                      frenchMonth[endMonth - 1])
+    else:
+        dateText.text = weeklyText.format(weekNum, englishMonth[monthNum - 1],
+                                          dayNum, dayNum + 6, yearNum, 
+                                          frenchMonth[monthNum - 1],
+                                          dayNum, dayNum + 6)
     fnameOut = weeklyOut.format(yearNum, weekNum)
 
 
 mxd.save()                                                                              # Saves the template copy
 print "Exporting PDF to {0}".format(os.path.join(out_dir, fnameOut))
 arcpy.mapping.ExportToPDF(mxd, os.path.join(out_dir, fnameOut))                        # Exports map to PDF
-
-raw_input("Done. Press enter to exit.")
