@@ -1,10 +1,18 @@
 '''Imports'''
-import numpy as np                                                                      # NumPy used for creating arrays 
+import numpy as np
+import scipy as sp                                                                    # NumPy used for creating arrays 
 import os
 import time
 from osgeo import gdal
 from osgeo import gdalconst
 import datetime
+import math
+
+from scipy.optimize import curve_fit
+from scipy.interpolate import interp1d
+
+import matplotlib
+import matplotlib.pyplot as plt
 
 gdal.AllRegister()
 dr = gdal.GetDriverByName("GTiff")
@@ -13,7 +21,7 @@ dr = gdal.GetDriverByName("GTiff")
 dir = os.getcwd();                                                                      # Directory of the script
 fn = os.path.join(dir, "images")                                                        # Directory of the image folder
 oput = os.path.join(dir, "output")
-final = os.path.join(dir, "output", "result.tiff")                                      # Resulting image
+final = os.path.join(dir, "output", "result.tif")                                      # Resulting image
 
 if (os.path.exists(fn)):
     next
@@ -31,6 +39,7 @@ temp_image = gdal.Open(os.path.join(os.path.join(fn + "\{0}".format(image_files[
 image_width = temp_image.RasterXSize                                                   # Image width in pixels
 image_length = temp_image.RasterYSize                                                   # Image length in pixels
 img_stack = np.empty((image_length, image_width, len(image_files)), np.dtype('f'))      # Create empty array for values, dtype should be set to 'f' for float
+result_raster = np.empty((image_length, image_width), np.dtype('f'))
 date = []
 temp_image = None
 
@@ -41,9 +50,9 @@ for i, fname in enumerate(image_files):
     dateConv = datetime.datetime(int(dateString[0:4]),
                                  int(dateString[4:6]),
                                  int(dateString[6:])) - datetime.datetime(int(dateString[0:4]), 1, 1) 
-                             
-    date.append(int(str(dateConv)[0: str(dateConv).index("day")]))
-    print date[i]
+    print str(dateConv)                         
+    date.append(float(str(dateConv)[0: str(dateConv).index(" ")]))
+date = np.array(date)
 
 '''Loop that loads images into a stack'''
 for i, fname in enumerate(image_files):
@@ -56,9 +65,45 @@ for i, fname in enumerate(image_files):
     img_stack[:, :, i] = img                                                            # Stores the image array into a stack
     img = None                                                                          # Clears the loaded array to reduce memory usage
 
+##Define function
+def func (x, a, b, c, d):
+    return d + c/(1+np.exp(a-b*x))
 
-for x in range(image_width):
-    for y in range(image_length):
-        print img_stack[x, y]
+newX = np.linspace(date[0], date[-1], (date[-1] - date[0]) + 1)
 
-raw_input("Finished")
+for x in range(image_length):
+    for y in range(image_width):
+        lai = img_stack[x, y]
+        f2 = interp1d(date, lai, kind='cubic')
+        newY = f2(newX)
+        
+        cumLAI = np.trapz(newY,newX)
+#        p0 =  (0.1, 0, 0, 7)
+#        popt, pcov = curve_fit(func, date, lai, p0)
+#        popt = np.empty((4))
+#        yEXP = func(trialX, *popt)
+#        
+#        a1 = popt[0]
+#        b1 = popt[1]
+#        c1 = popt[2]
+#        d1 = popt[3]
+#        
+#        yMax = (yEXP.max())
+#        SOSv = 0.5*yMax
+        
+#        SOSd = (a1-np.log((c1/(SOSv-d1))-1))/b1
+#        print SOSd
+
+        result_raster[x, y] = cumLAI
+
+output_raster = dr.Create(final, image_width, image_length, 1, gdal.GDT_Float32)        # Creates a raster with the dimensions of the timeseries images
+output_raster.GetRasterBand(1).WriteArray(result_raster)                                      # Writes the maximum values to the raster
+        
+        
+        
+        
+        
+        
+        
+        
+        
