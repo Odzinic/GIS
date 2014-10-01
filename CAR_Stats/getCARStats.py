@@ -21,6 +21,7 @@ delFields = ['ZONE_CODE', 'AREA', 'MEAN']
 weekNum = 30
 yearNum = 2014
 
+
 modisProj = "PROJCS['User_Defined_Sinusoidal',GEOGCS['GCS_User_Defined',DATUM['D_User_Defined',SPHEROID['User_Defined_Spheroid',6371007.181,0.0]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Sinusoidal'],PARAMETER['false_easting',0.0],PARAMETER['false_northing',0.0],PARAMETER['central_meridian',0.0],UNIT['Meter',1.0]]"
 maskProj = "GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433],METADATA['North America - NAD83',167.65,14.93,-47.74,86.45,0.0,0.0174532925199433,0.0,1350]]"
 
