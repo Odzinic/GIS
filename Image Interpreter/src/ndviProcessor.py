@@ -71,7 +71,7 @@ for i, img in enumerate(lisImages):
 #                 print imgStack[x, y, i]
 #                 tmp = imgStack[x, y, i]
 #imgStack[imgStack<0] = 0
-imgStack[:, :][imgStack[:, :]< 0] = 0
+imgStack[:, :][imgStack[:, :]< 0] = 3000
 endTime = time.time()
 print "Took {0} to load images".format(endTime - startTime)
 #maxNDVI = arcpy.NumPyArrayToRaster(np.amax(imgStack, 2)).save(os.path.join(outDir, "maxNDVI.tif"))
@@ -79,50 +79,66 @@ print "Took {0} to load images".format(endTime - startTime)
 # print maxNDVI
 
 date = np.array(date)
-
+maxDay = 0
+maxNDVI = 0
+sosNDVI = 0
+sosDay = 0
 ''' SoS '''
 
-def func (x, *p):
+def func(x, *p):
     A, mu, sigma = p
-    return A*np.exp(-(x-mu)**2/(2.*sigma**2))
+    return A * np.exp(-(x-mu)**2/(2.*sigma**2))
 
-popt = np.empty((4))
-p0 =  [1., 0., 1.]
+def findX(y, *p):
+    A, mu, sigma = p
+    return (-1 * math.sqrt((-1 * math.log(y/A)) * (2 * sigma**2))) + mu
+
+
+popt = np.empty((3))
+p0 = [1., 70., 10.]
+
 
 newX = np.linspace(date[0], date[-1], (date[-1] - date[0]) + 1)
+
+
 
 for x in range(imageHeight):
     for y in range(imageWidth):
         lai = imgStack[x, y]
-        if (np.count_nonzero(lai) > 3):
-            try:
-                popt, pcov = curve_fit(func, date, lai, p0)
-
-            except RuntimeError:
-                print("Error - curve_fit failed")
-            f2 = interp1d(date, lai, kind='cubic')
-            newY = f2(newX)
-            print newY
+        currMax = np.max(lai, 0)
+        try:
+            popt, pcov = curve_fit(func, date, lai, p0)
+            yFit = func(newX, *popt)
+            maxDay = popt[1]
+            maxNDVI = popt[0]
+            sosNDVI = yFit[0] + ((maxNDVI - yFit[0]) * 0.20)
+            sosDay = findX(sosNDVI, *popt)
+            print maxDay, maxNDVI, yFit[0], sosNDVI, sosDay
+        except RuntimeError:
+            #print "Max is at {0}".format(findX[popt[]])
+            pass
+            
         
-            yEXP = func(newX, *popt)
-
-            a1 = popt[0]
-            b1 = popt[1]
-            c1 = popt[2]
-        #d1 = popt[3]
+        
+        
+        
+        
+        
+        
         
         
         #Plot the figure
-            fig1 = plt.figure()
-            #plt.plot(date, lai, label='Data', ls='none', marker='o')
-            plt.plot(newX, f2(newX), 'r-',ls='--', label="Interpolated")
+        plt.figure()
+        #plt.plot(date, peval(lai, m.params), label='Fit')
+        plt.plot(date, lai, 'r-',ls='--', marker = 'D', label="Interpolated")
 #        plt.plot(newX, newY, 'r-',ls='--', label="Cubic")
-            #plt.plot(newX, yEXP, 'r-',ls='none', marker = '*',label="EXP")
+        plt.plot(newX, yFit, 'g-',ls='none', marker = '*',label="EXP")
+        plt.plot(np.array(sosDay), np.array(sosNDVI), 'r-', ls = 'none', marker = 'D')
         ##plt.plot(doy, lai,'o',newX,f(newX),'-', newX, f2(trailX),'--')
         ##plt.legend(['data', 'linear', 'cubic'], loc='best')
-            fig1.show()
-            time.sleep(3)
-            plt.close(fig1)
+        plt.show()
+#             time.sleep(1)
+#             plt.close(fig1)
 
 
 
