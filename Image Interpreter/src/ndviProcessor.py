@@ -170,6 +170,10 @@ for num in range(len(splitLen)):
     for x in range(imageHeight):
         for y in range(imageWidth):
             lai = imgStack[x, y]                                                            # List of raw NDVI vales
+            
+            if (lai.all() == 0):
+                pass
+            
             filtY = np.where(lai == 0)[0]                                                   # Finds indexes of pixels that are outliers (<=0)
             lai = np.delete(lai, filtY, 0)                                                  # Deletes the outlier Y-values
             newdate = np.delete(lisDates, filtY, 0)                                         # Deletes the outlier X-values
@@ -184,9 +188,9 @@ for num in range(len(splitLen)):
                 sosDay = findX_gauss(sosNDVI, *popt)                                        # Determines the start of season day
                 sosIndex = findIndex(yFit, sosNDVI)
                 eosNDVI = yFit[-1] + ((maxNDVI - yFit[-1]) * 0.40)                          # Determines the end of season NDVI
-                revFit = yFit[::-1][:(len(yFit) * .75)]                              # TRY LEN(YFIT) * .75 NOT LEN(YFIT * .75)
+                revFit = yFit
                 eosIndex = (len(yFit) - 1) - findIndex(revFit, eosNDVI)
-                eosDay = newX[eosIndex]                                                     # Determines the end of season day
+                eosDay = maxDay + (maxDay - findX_gauss(eosNDVI, *popt))#newX[eosIndex]     # Determines the end of season day                                                   
                 seasDur = eosDay - sosDay                                                   # Determines the duration of season
                 seasAmp = maxNDVI - sosNDVI                                                 # Determines the NDVI amplitude
                 seasInteg = np.trapz(yFit[sosIndex:eosIndex], newX[sosIndex:eosIndex])      # Determines the time integrated NDVI
@@ -238,16 +242,26 @@ for num in range(len(splitLen)):
     #         plt.close(fig1)
       
               
-    arcpy.NumPyArrayToRaster(sosdayRaster).save(os.path.join(tmpoutDir, "SOS_Day", "SOS_Day{0}.tif".format(num)))
-    arcpy.NumPyArrayToRaster(eosdayRaster).save(os.path.join(tmpoutDir, "EOS_Day", "EOS_Day{0}.tif".format(num)))
-    arcpy.NumPyArrayToRaster(sosndviRaster).save(os.path.join(tmpoutDir, "SOS_NDVI", "SOS_NDVI{0}.tif".format(num)))
-    arcpy.NumPyArrayToRaster(eosndviRaster).save(os.path.join(tmpoutDir, "EOS_NDVI", "EOS_NDVI{0}.tif".format(num)))
-    arcpy.NumPyArrayToRaster(maxdayRaster).save(os.path.join(tmpoutDir, "MAX_Day", "MAX_Day{0}.tif".format(num)))
-    arcpy.NumPyArrayToRaster(maxndviRaster).save(os.path.join(tmpoutDir, "MAX_NDVI", "MAX_NDVI{0}.tif".format(num)))
-    arcpy.NumPyArrayToRaster(seasdurRaster).save(os.path.join(tmpoutDir, "SEAS_Duration", "SEAS_Duration{0}.tif".format(num)))
-    arcpy.NumPyArrayToRaster(seasampRaster).save(os.path.join(tmpoutDir, "SEAS_Amplitude", "SEAS_Amplitude{0}.tif".format(num)))
-    arcpy.NumPyArrayToRaster(seasintegRaster).save(os.path.join(tmpoutDir, "SEAS_Integrated", "SEAS_Integrated{0}.tif".format(num)))
-    arcpy.NumPyArrayToRaster(seaspasgRaster).save(os.path.join(tmpoutDir, "SEAS_PASG", "SEAS_PASG{0}.tif".format(num)))
+    arcpy.NumPyArrayToRaster(sosdayRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
+                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "SOS_Day", "SOS_Day{0}.tif".format(num)))
+    arcpy.NumPyArrayToRaster(eosdayRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
+                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "EOS_Day", "EOS_Day{0}.tif".format(num)))
+    arcpy.NumPyArrayToRaster(sosndviRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
+                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "SOS_NDVI", "SOS_NDVI{0}.tif".format(num)))
+    arcpy.NumPyArrayToRaster(eosndviRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
+                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "EOS_NDVI", "EOS_NDVI{0}.tif".format(num)))
+    arcpy.NumPyArrayToRaster(maxdayRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
+                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "MAX_Day", "MAX_Day{0}.tif".format(num)))
+    arcpy.NumPyArrayToRaster(maxndviRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
+                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "MAX_NDVI", "MAX_NDVI{0}.tif".format(num)))
+    arcpy.NumPyArrayToRaster(seasdurRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
+                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "SEAS_Duration", "SEAS_Duration{0}.tif".format(num)))
+    arcpy.NumPyArrayToRaster(seasampRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
+                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "SEAS_Amplitude", "SEAS_Amplitude{0}.tif".format(num)))
+    arcpy.NumPyArrayToRaster(seasintegRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
+                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "SEAS_Integrated", "SEAS_Integrated{0}.tif".format(num)))
+    arcpy.NumPyArrayToRaster(seaspasgRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
+                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "SEAS_PASG", "SEAS_PASG{0}.tif".format(num)))
       
       
     finalTime = time.time()
