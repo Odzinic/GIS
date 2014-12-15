@@ -7,9 +7,11 @@ import time
 import datetime
 import math
 import zipfile
+import scipy
 from scipy.optimize import curve_fit
 import matplotlib
 import matplotlib.pyplot as plt
+from scipy.optimize.minpack import fsolve
 
 arcpy.env.overwriteOutput = True
 arcpy.CheckOutExtension('spatial')
@@ -40,15 +42,17 @@ lisImages = filter((lambda x: x.endswith('.tif')), os.listdir(imageDir))
 lisZips = os.listdir(archiveDir)
 sosConst = 0.40
 eosConst = 0.40
+lisDates = []                                                                           # List that contains the dates of the images
+                                                                                       # in the series
 
 
 
-# '''Extracts images from zipped archives'''
-# for zipImg in lisZips:
-#     f = os.path.join(archiveDir, zipImg)
-#     
-#     with zipfile.ZipFile(f, "r") as z:
-#         z.extractall(convertDir)
+'''Extracts images from zipped archives'''
+for zipImg in lisZips:
+    f = os.path.join(archiveDir, zipImg)
+     
+    with zipfile.ZipFile(f, "r") as z:
+        z.extractall(convertDir)
 
 
 
@@ -94,6 +98,10 @@ for img in convImages:
 
 '''Splits rasters into tiles and stores results in temporary folders'''
 for num in range(len(lisImages)):
+    
+    dateString = lisImages[num].split(".")[3]                                               # Parse the date from the file name
+    lisDates.append(int(dateString[4:7]))                                                   # Add the image date to the list of dates (lisDates)
+    
     splitDir = os.path.join(tmpDir, str(num))                                               # Directory for storing split outputs
     os.mkdir(splitDir)                                                                      # Create folder for storing split outputs
     splitImg = os.path.join(imageDir, lisImages[num])                                       # Path to image that will be split
@@ -145,8 +153,6 @@ for num in range(len(splitLen)):
     rasterYCellSize = tmpImg.meanCellHeight                                                 # Mean height of series
     tmpImg = None                                                                           # Clears raster from memory
          
-    lisDates = []                                                                           # List that contains the dates of the images
-                                                                                            # in the series
                                                                                                
     '''Create numpy array to contain loaded timestack'''  
     imgStack = np.empty((imageHeight, imageWidth, len(splitDirs)), np.dtype('int16'))       # 3-D array that contains all of the images
@@ -184,8 +190,8 @@ for num in range(len(splitLen)):
     endTime = time.time()
     print "Took {0} to load images".format(endTime - startTime)
          
-         
-    lisDates = np.array(lisDates)                                                           # Converts the list of dates (lisDates) into an
+    lisDates.sort()     
+    sortDates = np.array(lisDates)                                                    # Converts the list of dates (lisDates) into an
                                                                                             # array to make it compatible with curve fitting
        
     '''Initialize constants'''                                                                                        
@@ -203,6 +209,7 @@ for num in range(len(splitLen)):
     def findX_gauss(y, *p):
         A, mu, sigma = p                                                                    # Paramaters for the fit
         return (-1 * math.sqrt((-1 * math.log(y/A)) * (2 * sigma**2))) + mu                 # Calculation used to determine the fitted X-value
+    
          
     def dbl_logistic_model (p, agdd):
         return p[0] + p[1]* ( 1./(1+np.exp(p[2]*(agdd-p[3]))) + \
@@ -214,8 +221,7 @@ for num in range(len(splitLen)):
     popt = np.empty((3))
     p0 = [.7869, 202., 39.0803]                                                             # Parameters for Gaussian fit
     p1 = [0.8491, 0.9340, 0.6787, 90, 0.7431, 200]                                          # Parameters for Double Logistic fit
-    newX = np.linspace(lisDates[0], lisDates[-1], (lisDates[-1] - lisDates[0]) + 1)         # Array that contains interpolated dates
-         
+    newX = np.linspace(sortDates[0], sortDates[-1], (sortDates[-1] - sortDates[0]) + 1)         # Array that contains interpolated dates      
     count = 0
        
        
@@ -233,21 +239,21 @@ for num in range(len(splitLen)):
                  
             try:
                 popt, pcov = curve_fit(func_gauss, newdate, lai, p0)                        # Applies SciPy curve fit to the values and fetches
-                                                                                            # fitting values (popt)
+                                                                                            # fitting values (popt)              
                 yFit = func_gauss(newX, *popt)                                              # Fits the raw Y-values using fitted values (popt)
                 maxDay = popt[1]                                                            # Fetches the maximum NDVI day
                 maxNDVI = popt[0]                                                           # Fetches the maximum NDVI
                 sosNDVI = yFit[0] + ((maxNDVI - yFit[0]) * sosConst)                        # Determines that start of season NDVI
                 sosDay = findX_gauss(sosNDVI, *popt)                                        # Determines the start of season day
-                sosIndex = (len(yFit) - 1) - int(findIndex(yFit, sosNDVI))
+                sosIndex = int(findIndex(newX, sosDay))
                 eosNDVI = yFit[-1] + ((maxNDVI - yFit[-1]) * eosConst)                      # Determines the end of season NDVI
-                eosIndex = findIndex(yFit, sosNDVI)
-                eosDay = maxDay + (maxDay - findX_gauss(eosNDVI, *popt))#newX[eosIndex]     # Determines the end of season day                                                   
+                
+                eosDay = maxDay + (maxDay - findX_gauss(eosNDVI, *popt))#newX[eosIndex]     # Determines the end of season day    
+                eosIndex = int(findIndex(newX, eosDay))                                               
                 seasDur = eosDay - sosDay                                                   # Determines the duration of season
                 seasAmp = maxNDVI - sosNDVI                                                 # Determines the NDVI amplitude
                 seasInteg = np.trapz(yFit[sosIndex:eosIndex], newX[sosIndex:eosIndex])      # Determines the time integrated NDVI
                 seasPASG = sum(yFit[sosIndex:eosIndex] - sosNDVI)                           # Determines the percent annual seasonal greeness
-                 
                  
                    
                 '''Store results at the current pixel in the result rasters 
@@ -265,8 +271,14 @@ for num in range(len(splitLen)):
                 seasampRaster[x, y] = seasAmp / 10000
                 seasintegRaster[x, y] = seasInteg / 10000
                 seaspasgRaster[x, y] = seasPASG / 10000
-             
-                '''s'''
+
+
+#                 plt.figure()
+#                 plt.plot(newX, yFit, 'g-',ls='none', marker = '*',label="EXP")
+#                 plt.plot(np.array(sosDay), np.array(sosNDVI), 'y-', ls = 'none', marker = 'D')
+#                 plt.plot(np.array(eosDay), np.array(eosNDVI), 'y-', ls = 'none', marker = 'D')
+#                 plt.show()
+                
             except RuntimeError:
                 pass
                            
@@ -283,19 +295,19 @@ for num in range(len(splitLen)):
                  
                  
             #Plot the figure
-#             fig1 = plt.figure()
+            
 #            plt.plot(date, peval(lai, m.params), label='Fit')
 #             plt.plot(newdate, lai, 'r-',ls='--', marker = 'D', label="Interpolated")
 #     #        plt.plot(newX, newY, 'r-',ls='--', label="Cubic")
-#             plt.plot(newX, yFit, 'g-',ls='none', marker = '*',label="EXP")
-#             plt.plot(np.array(sosDay), np.array(sosNDVI), 'y-', ls = 'none', marker = 'D')
-#             plt.plot(np.array(eosDay), np.array(eosNDVI), 'y-', ls = 'none', marker = 'D')
+#            plt.plot(newX, yFit, 'g-',ls='none', marker = '*',label="EXP")
+#            plt.plot(np.array(sosDay), np.array(sosNDVI), 'y-', ls = 'none', marker = 'D')
+#            plt.plot(np.array(eosDay), np.array(eosNDVI), 'y-', ls = 'none', marker = 'D')
 #            plt.plot(np.array(eosDay), np.array(eosNDVI), 'y-', ls = 'none', marker = 'D')
 #            #plt.plot(doy, lai,'o',newX,f(newX),'-', newX, f2(trailX),'--')
 #             plt.legend(['data', 'fitted data', 'start of season'], loc='best')
 #             plt.xlabel("Day of year")
 #             plt.ylabel("NDVI scaled up by a factor of 10000")
-#             fig1.show()
+#            plt.show()
 #            plt.savefig(r"E:\Omar\Github_Temp\Gtemp\Image Interpreter\src\figures\{0}.png".format(count), format = "png")
 #             time.sleep(3)
 #             plt.close(fig1)
