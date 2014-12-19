@@ -1,7 +1,7 @@
 
 '''Imports'''
 import arcpy
-import numpy as np                                                                  # NumPy used for creating arrays
+import numpy as np                                                                          # NumPy used for creating arrays
 import os
 import time
 import datetime
@@ -15,7 +15,7 @@ from scipy.optimize.minpack import fsolve
 
 arcpy.env.overwriteOutput = True
 arcpy.CheckOutExtension('spatial')
-
+np.seterr(all='ignore')
 
 
 
@@ -29,37 +29,46 @@ tmpDir = os.path.join(mainDir, "temp")                                          
 tmpoutDir = os.path.join(tmpDir, "out")                                                     # Temporary directory for results of tiled rasters
 outDir = os.path.join(mainDir, "output")                                                    # Output directory
 
+
 '''Check if output directory exists and create one if not'''
 if (os.path.exists(outDir)):
     next
 else:
     os.mkdir(outDir)
     
+if (os.path.exists(tmpDir)):
+    next
+else:
+    os.mkdir(tmpDir)
+    
 
 
 '''Constants'''
-lisImages = filter((lambda x: x.endswith('.tif')), os.listdir(imageDir))
 lisZips = os.listdir(archiveDir)
 sosConst = 0.40
 eosConst = 0.40
-lisDates = []                                                                           # List that contains the dates of the images
-                                                                                       # in the series
+
 
 
 
 '''Extracts images from zipped archives'''
+print "Extracting rasters from archives"
+
 for zipImg in lisZips:
     f = os.path.join(archiveDir, zipImg)
      
     with zipfile.ZipFile(f, "r") as z:
         z.extractall(convertDir)
+print "Extraction complete"
 
 
 
 
 '''Converts MODIS images from 32 bit float to 16 bit int'''
+print "Converting images to 16 bit integer format"
+
 convImages = filter((lambda x: x.endswith('.tif')), os.listdir(convertDir))                 # List of images to convert
-tmpImg = arcpy.Raster(os.path.join(convertDir, convImages[0]))                                 # Load a temp image to fetch metadata and height/width
+tmpImg = arcpy.Raster(os.path.join(convertDir, convImages[0]))                              # Load a temp image to fetch metadata and height/width
 imageWidth = tmpImg.width                                                                   # Width of images
 imageHeight = tmpImg.height                                                                 # Height of images
 
@@ -80,23 +89,29 @@ inArray = np.empty((imageHeight, imageWidth), np.dtype('float32'))              
 ''' Perform conversion on images '''
 for img in convImages:
         
-    array = arcpy.RasterToNumPyArray(os.path.join(convertDir, img),                           # Loads raster into array
+    array = arcpy.RasterToNumPyArray(os.path.join(convertDir, img),                         # Loads raster into array
                                      arcpy.Point(rasterExtentX, rasterExtentY),"", "")
                                          
     array = np.multiply(array, 10000)                                                       # Multiplies each value by 10000
     outArray = array.astype(int)                                                            # Converts data type from float to int
     outArray[outArray<0] = -9999                                                            # Makes all data negative and NoData values 0
     outArray = arcpy.NumPyArrayToRaster(outArray, "", "", "", 
-                                        -9999).save(os.path.join(imageDir, img))                               # Loads converted values into array of ints and saves to 
+                                        -9999).save(os.path.join(imageDir, img))            # Loads converted values into array of ints and saves to 
                                                                                             # output
      
     array = None
     print "{0} converted".format(img)
+print "Conversion complete"
 
+
+lisImages = filter((lambda x: x.endswith('.tif')), os.listdir(imageDir))
+lisImages.sort()
 
 
 
 '''Splits rasters into tiles and stores results in temporary folders'''
+print "Creating subsets of time-series"
+
 for num in range(len(lisImages)):
     
     dateString = lisImages[num].split(".")[3]                                               # Parse the date from the file name
@@ -109,6 +124,7 @@ for num in range(len(lisImages)):
                                  splitDir, 
                                  "{0}.".format(lisImages[num][:len(lisImages[num])-4]), 
                                  "SIZE_OF_TILE", "TIFF", "", "", "4000 4000")
+print "Subsetting complete"
  
 splitLen = filter((lambda x: x.endswith('.TIF')), os.listdir(os.path.join(tmpDir, '0')))    # Make dynamic from splitdirs
 splitDirs = filter((lambda x: type(int(x)) == int), os.listdir(tmpDir))
@@ -137,6 +153,7 @@ os.mkdir(os.path.join(tmpoutDir, 'SEAS_PASG'))
   
   
 for num in range(len(splitLen)):
+    print "Processing subset {0}".format(num + 1)
      
     '''Image constants'''
     tmpImg = arcpy.Raster(os.path.join(tmpDir, splitDirs[0], splitLen[num]))                # Loads a temporary image to get metadata from
@@ -170,11 +187,12 @@ for num in range(len(splitLen)):
     seasintegRaster = np.zeros((imageHeight, imageWidth), np.dtype('float32'))              # Array that contains time integrated NDVI
     seaspasgRaster = np.zeros((imageHeight, imageWidth), np.dtype('float32'))               # Array that contains percent average greeness
        
-       
+    lisDates = []                                                                           # List that contains the dates of the images
+                                                                                            # in the series
+                                                                                               
     '''Load the timeseries images into the timeseries array'''  
     startTime = time.time()
     for i, dir in enumerate(splitDirs):
-        print i
         img = filter((lambda x: x.endswith('.TIF')),                                        # Current raster that will be loaded
                      os.listdir(os.path.join(tmpDir, dir)))[num]
         dateString = img.split(".")[3]                                                      # Parse the date from the file name
@@ -189,9 +207,8 @@ for num in range(len(splitLen)):
     imgStack[:, :][imgStack[:, :]< 0] = 0                                                   # Changes all NDVI values that are below zero to zero
     endTime = time.time()
     print "Took {0} to load images".format(endTime - startTime)
-         
-    lisDates.sort()     
-    sortDates = np.array(lisDates)                                                    # Converts the list of dates (lisDates) into an
+   
+    sortDates = np.array(lisDates)                                                          # Converts the list of dates (lisDates) into an
                                                                                             # array to make it compatible with curve fitting
        
     '''Initialize constants'''                                                                                        
@@ -217,11 +234,12 @@ for num in range(len(splitLen)):
          
     def findIndex(lst, val):
         return min(enumerate(lst), key=lambda x: abs(x[1]-val))[0]
-         
+    
+    '''Curve fitting constants'''     
     popt = np.empty((3))
     p0 = [.7869, 202., 39.0803]                                                             # Parameters for Gaussian fit
     p1 = [0.8491, 0.9340, 0.6787, 90, 0.7431, 200]                                          # Parameters for Double Logistic fit
-    newX = np.linspace(sortDates[0], sortDates[-1], (sortDates[-1] - sortDates[0]) + 1)         # Array that contains interpolated dates      
+    newX = np.linspace(sortDates[0], sortDates[-1], (sortDates[-1] - sortDates[0]) + 1)     # Array that contains interpolated dates      
     count = 0
        
        
@@ -235,7 +253,7 @@ for num in range(len(splitLen)):
                
             filtY = np.where(lai == 0)[0]                                                   # Finds indexes of pixels that are outliers (<=0)
             lai = np.delete(lai, filtY, 0)                                                  # Deletes the outlier Y-values
-            newdate = np.delete(lisDates, filtY, 0)                                         # Deletes the outlier X-values
+            newdate = np.delete(sortDates, filtY, 0)                                         # Deletes the outlier X-values
                  
             try:
                 popt, pcov = curve_fit(func_gauss, newdate, lai, p0)                        # Applies SciPy curve fit to the values and fetches
@@ -284,33 +302,7 @@ for num in range(len(splitLen)):
                            
             except TypeError:
                 pass
-                                            
-                 
-              
-                 
-                 
-                 
-                 
-                 
-                 
-                 
-            #Plot the figure
-            
-#            plt.plot(date, peval(lai, m.params), label='Fit')
-#             plt.plot(newdate, lai, 'r-',ls='--', marker = 'D', label="Interpolated")
-#     #        plt.plot(newX, newY, 'r-',ls='--', label="Cubic")
-#            plt.plot(newX, yFit, 'g-',ls='none', marker = '*',label="EXP")
-#            plt.plot(np.array(sosDay), np.array(sosNDVI), 'y-', ls = 'none', marker = 'D')
-#            plt.plot(np.array(eosDay), np.array(eosNDVI), 'y-', ls = 'none', marker = 'D')
-#            plt.plot(np.array(eosDay), np.array(eosNDVI), 'y-', ls = 'none', marker = 'D')
-#            #plt.plot(doy, lai,'o',newX,f(newX),'-', newX, f2(trailX),'--')
-#             plt.legend(['data', 'fitted data', 'start of season'], loc='best')
-#             plt.xlabel("Day of year")
-#             plt.ylabel("NDVI scaled up by a factor of 10000")
-#            plt.show()
-#            plt.savefig(r"E:\Omar\Github_Temp\Gtemp\Image Interpreter\src\figures\{0}.png".format(count), format = "png")
-#             time.sleep(3)
-#             plt.close(fig1)
+                                                           
          
     '''Filter the data to remove error values'''
     sosdayRaster[(sosdayRaster < 0) | (sosdayRaster > 365)] = 0
@@ -324,28 +316,30 @@ for num in range(len(splitLen)):
     seaspasgRaster[(seaspasgRaster < 0) | (seaspasgRaster > 100)] = 0
        
      
-    '''Convert the output arrays to rasters and save them in an output folder'''            
+    '''Convert the output arrays to rasters and save them in an output folder'''
+    print "Exporting results to raster format"
+                
     arcpy.NumPyArrayToRaster(sosdayRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
-                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "SOS_Day", "SOS_Day{0}.tif".format(num)))
+                                                                 rasterExtentY), "", "", 0).save(os.path.join(tmpoutDir, "SOS_Day", "SOS_Day{0}.tif".format(num)))
     arcpy.NumPyArrayToRaster(eosdayRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
-                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "EOS_Day", "EOS_Day{0}.tif".format(num)))
+                                                                 rasterExtentY), "", "", 0).save(os.path.join(tmpoutDir, "EOS_Day", "EOS_Day{0}.tif".format(num)))
     arcpy.NumPyArrayToRaster(sosndviRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
-                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "SOS_NDVI", "SOS_NDVI{0}.tif".format(num)))
+                                                                 rasterExtentY), "", "", 0).save(os.path.join(tmpoutDir, "SOS_NDVI", "SOS_NDVI{0}.tif".format(num)))
     arcpy.NumPyArrayToRaster(eosndviRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
-                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "EOS_NDVI", "EOS_NDVI{0}.tif".format(num)))
+                                                                 rasterExtentY), "", "", 0).save(os.path.join(tmpoutDir, "EOS_NDVI", "EOS_NDVI{0}.tif".format(num)))
     arcpy.NumPyArrayToRaster(maxdayRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
-                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "MAX_Day", "MAX_Day{0}.tif".format(num)))
+                                                                 rasterExtentY), "", "", 0).save(os.path.join(tmpoutDir, "MAX_Day", "MAX_Day{0}.tif".format(num)))
     arcpy.NumPyArrayToRaster(maxndviRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
-                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "MAX_NDVI", "MAX_NDVI{0}.tif".format(num)))
+                                                                 rasterExtentY), "", "", 0).save(os.path.join(tmpoutDir, "MAX_NDVI", "MAX_NDVI{0}.tif".format(num)))
     arcpy.NumPyArrayToRaster(seasdurRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
-                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "SEAS_Duration", "SEAS_Duration{0}.tif".format(num)))
+                                                                 rasterExtentY), "", "", 0).save(os.path.join(tmpoutDir, "SEAS_Duration", "SEAS_Duration{0}.tif".format(num)))
     arcpy.NumPyArrayToRaster(seasampRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
-                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "SEAS_Amplitude", "SEAS_Amplitude{0}.tif".format(num)))
+                                                                 rasterExtentY), "", "", 0).save(os.path.join(tmpoutDir, "SEAS_Amplitude", "SEAS_Amplitude{0}.tif".format(num)))
     arcpy.NumPyArrayToRaster(seasintegRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
-                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "SEAS_Integrated", "SEAS_Integrated{0}.tif".format(num)))
+                                                                 rasterExtentY), "", "", 0).save(os.path.join(tmpoutDir, "SEAS_Integrated", "SEAS_Integrated{0}.tif".format(num)))
     arcpy.NumPyArrayToRaster(seaspasgRaster, arcpy.Point(rasterExtentX,             # into an array and loads it into the timeseries
-                                                                 rasterExtentY)).save(os.path.join(tmpoutDir, "SEAS_PASG", "SEAS_PASG{0}.tif".format(num)))
-         
+                                                                 rasterExtentY), "", "", 0).save(os.path.join(tmpoutDir, "SEAS_PASG", "SEAS_PASG{0}.tif".format(num)))
+    print "Exporting results to raster complete"     
          
     finalTime = time.time()
     print "Image took {0} minutes to process and finished at {1}".format(((finalTime - startTime) / 60), time.ctime())
@@ -353,6 +347,8 @@ for num in range(len(splitLen)):
  
  
 '''Mosaic the subsets and save the output raster in the output folder'''
+print "Mosaicing subsets"
+
 for subDir in os.listdir(tmpoutDir):
     intFolders = ["EOS_Day", "SOS_Day", "MAX_Day", "SEAS_Duration"]
     rasterDtype = None
@@ -368,5 +364,7 @@ for subDir in os.listdir(tmpoutDir):
          
     arcpy.MosaicToNewRaster_management(subRasters, outDir, saveName, "",\
                                        rasterDtype, "", "1", "LAST","FIRST")
+    
+print "Process completed at {0}".format(time.ctime())
      
     
