@@ -18,7 +18,7 @@ arcpy.CheckOutExtension('spatial')
 np.seterr(all='ignore')
 
 
-
+''
 
 '''Directories'''
 mainDir = os.getcwd();                                                                      # Directory of the script
