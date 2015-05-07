@@ -1,14 +1,25 @@
-import urllib2
+import os
+import urllib2, urllib
 import xlwt
 from datetime import  datetime, timedelta
 
+output_dir = r"C:\Users\DZINICOM\Downloads"
+text_output = r"C:\Users\DZINICOM\Downloads\FireBlight_Conditions.xls"
+bkp_fldr = os.path.join(output_dir, "FireBlight_Script_Bk")
+sevenday_bkp = os.path.join(bkp_fldr, "7 Day Forecasts")
+singleday_bkp = os.path.join(bkp_fldr, "24 Hour Forecasts")
+
+
 temp_array = []
 pop_array = []
+precip_array = []
 currTemp_array = []
 currPop_array = []
+currPrecip_array = []
 counter = 0
 temp_pos = 0
 curr_pos = 0
+
 
 locations = ["Alliston Simcoe South", "Bancroft - Hastings North", "Barrie Simcoe Central", "Barry's Bay - Renfrew West", 
              "Belle River- Essex North", "Belleville Hastings East", "Brant", "Britt", "Brockville Leeds and Grenville East",
@@ -118,6 +129,15 @@ url_code = {"Alliston Simcoe South": "so045",
             "York North": "so038",
             "York South": "so037"}
 
+if (os.path.exists(bkp_fldr) == False):
+        os.mkdir(bkp_fldr)
+        
+if (os.path.exists(sevenday_bkp) == False):
+        os.mkdir(sevenday_bkp)
+        
+if (os.path.exists(singleday_bkp) == False):
+        os.mkdir(singleday_bkp)
+
 
 #===============================================================================
 #                     Create a list of the dates of the week
@@ -140,7 +160,7 @@ ws = wb.add_sheet("Temperatures")
 ws.write(0, 0, "FarmZone")
 ws.write(0, 1, "Date")
 ws.write(0, 2, "Temperature")
-ws.write(0, 3, "P.O.P.")
+ws.write(0, 3, "Precipitation")
 dateStyle = xlwt.easyxf(num_format_str='MM/D/YY')
 
 
@@ -153,32 +173,50 @@ urllib2.install_opener(opener)
 
 
 
+
  
 for loc in locations:
-   
+    
     locCode = url_code[loc]
     sock = urllib2.urlopen("http://www.farmzone.com/sevenday_forecast/{0}".format(locCode))
-       
+        
     siteHTML = sock.read()
     sock.close()
+    
+    save_path = os.path.join(sevenday_bkp, "{0}".format(datetime.now().date()))
+    
+    if (os.path.exists(save_path)):
+        backup_file = open(os.path.join(save_path, "{0}.html".format(loc)), 'w')
+        backup_file.write(siteHTML)
+        backup_file.close()
+        
+        
+    else:
+        os.mkdir(save_path)
+        backup_file = open(os.path.join(save_path, "{0}.html".format(loc)), 'w')
+        backup_file.write(siteHTML)
+        backup_file.close()
+        
+   
+    print loc   
+#     for url in siteHTML.split("\n"):
+#         counter += 1
+#         if 'daypop' in url:
+#             counter += 5
+#             rest = siteHTML.split("\n")[counter:]
+#             for num in range(6):
+#                 pop = rest[num].split('<td>')[1][:2]
+#                 try:
+#                     int(pop)
+#                     pop_array.append(int(pop))
+#                 except ValueError:
+#                     pop_array.append(int(pop[:1]))
+#             counter = 0
+#             break
   
       
-    for url in siteHTML.split("\n"):
-        counter += 1
-        if 'daypop' in url:
-            counter += 5
-            rest = siteHTML.split("\n")[counter:]
-            for num in range(6):
-                pop = rest[num].split('<td>')[1][:2]
-                try:
-                    int(pop)
-                    pop_array.append(int(pop))
-                except ValueError:
-                    pop_array.append(int(pop[:1]))
-            counter = 0
-            break
-            
-         
+              
+           
     for url in siteHTML.split("\n"):
         counter += 1    
         if 'High Temperature' in url:
@@ -193,15 +231,70 @@ for loc in locations:
                     temp_array.append(int(temp[:1]))
             counter = 0
             break
-            
-         
+          
+    for url in siteHTML.split("\n"):
+        counter += 1    
+        if '<h2 class="alt">Rain</h2>' in url:
+            counter += 1
+            rest = siteHTML.split("\n")[counter:]
+            for num in range(6):
+                temp = rest[num].split('<td>')[1]
+                if (temp == '-</td>\r'):
+                    precip_array.append(0)
+                     
+                elif ('less than 1' in temp):
+                    precip_array.append(1)  
+                       
+                elif('close to ' in temp):
+                    try:
+                        int(temp[9:11])
+                        precip_array.append(int(temp[9:11]))
+                    except ValueError:
+                        precip_array.append(int(temp[9:10]))
+                         
+                elif(len(temp.split('-')) == 2):
+                    try:
+                        int(temp.split('-')[1][:2])
+                        precip_array.append(int(temp.split('-')[1][:2]))
+                    except ValueError:    
+                        precip_array.append(int(temp.split('-')[1][:1]))
+                
+                else:
+                    print "broken", temp      
+            counter = 0
+            break
+        elif(len(siteHTML.split("\n")) == counter):
+            for num in range(6):
+                precip_array.append(0)
+            counter = 0
+            break
+        
+        
+             
+          
 for loc in locations:
     locCode = url_code[loc]
     sock = urllib2.urlopen("http://www.farmzone.com/next_twentyfourhours/{0}".format(locCode))
-     
+        
     siteHTML = sock.read()
     sock.close()
     
+    save_path = os.path.join(singleday_bkp, "{0}".format(datetime.now().date()))
+    
+    if (os.path.exists(save_path)):
+        backup_file = open(os.path.join(save_path, "{0}.html".format(loc)), 'w')
+        backup_file.write(siteHTML)
+        backup_file.close()
+        
+        
+    else:
+        os.mkdir(save_path)
+        backup_file = open(os.path.join(save_path, "{0}.html".format(loc)), 'w')
+        backup_file.write(siteHTML)
+        backup_file.close()
+     
+    print loc
+       
     for url in siteHTML.split("\n"):
         counter += 1
         if 'sttemp' in url:
@@ -215,41 +308,76 @@ for loc in locations:
                 currTemp_array.append(int(curr_temp[:1]))   
             counter = 0
             break
-        
+         
     for url in siteHTML.split("\n"):
-        counter += 1
-        if 'stpop' in url:
-            counter += 5
+        counter += 1    
+        if 'stprecip' in url:
+            counter += 6
             rest = siteHTML.split("\n")[counter:]
-            pop = rest[0].split('<td>')[1][:2]
-            try:
-                int(pop)
-                currPop_array.append(int(pop))
-            except ValueError:
-                currPop_array.append(int(pop[:1]))
+            temp = rest[1]
+            print temp
+            if ('\t-\t' in temp):
+                currPrecip_array.append(0)
+                  
+            elif ('close to 1mm' in temp or 'less than 1mm' in temp):
+                currPrecip_array.append(1)  
+                    
+            elif('close to' in temp):
+                try:
+                    int(temp[temp.index('to')+2 : temp.index('to')+5])
+                    currPrecip_array.append(int(temp[temp.index('to')+2 : temp.index('to')+5]))
+                except ValueError:
+                    currPrecip_array.append(int(temp[temp.index('to')+2 : temp.index('to')+4]))
+                      
+            elif(len(temp.split('-')) == 2):
+                try:
+                    int(temp[temp.index('-') + 1: temp.index('-') + 3])
+                    currPrecip_array.append(int(temp[temp.index('-') + 1: temp.index('-') + 3]))
+                except ValueError:    
+                    currPrecip_array.append(int(temp[temp.index('-') + 1: temp.index('-') + 2]))
+                                
             counter = 0
             break
-       
+        elif(len(siteHTML.split("\n")) == counter):
+            counter = 0
+            currPrecip_array.append(0)
+            break
+           
+#     for url in siteHTML.split("\n"):
+#         counter += 1
+#         if 'stpop' in url:
+#             counter += 5
+#             rest = siteHTML.split("\n")[counter:]
+#             pop = rest[0].split('<td>')[1][:2]
+#             try:
+#                 int(pop)
+#                 currPop_array.append(int(pop))
+#             except ValueError:
+#                 currPop_array.append(int(pop[:1]))
+#             counter = 0
+#             break
+ 
+     
+          
     for num in range(7):
         if (num == 0):
             ws.write(y_pos, 0, loc)
             ws.write(y_pos, 1, weekDates[num], dateStyle)
             ws.write(y_pos, 2, currTemp_array[curr_pos])
-            ws.write(y_pos, 3, currPop_array[curr_pos])
+            ws.write(y_pos, 3, currPrecip_array[curr_pos])
             y_pos += 1
         else:
             ws.write(y_pos, 0, loc)
             ws.write(y_pos, 1, weekDates[num], dateStyle)
             ws.write(y_pos, 2, temp_array[temp_pos])
-            ws.write(y_pos, 3, pop_array[temp_pos])
+            ws.write(y_pos, 3, precip_array[temp_pos])
             y_pos += 1
             temp_pos += 1
-#             wb.save(r"C:\Users\DZINICOM\Downloads\test.xls")
+            wb.save(text_output)
 #             print "{0} written".format(loc)
-     
+         
     curr_pos += 1
-    
-wb.save(r"C:\Users\DZINICOM\Downloads\test.xls")
-raw_input = "Press key"
-    
+        
+wb.save(text_output)
+     
 
