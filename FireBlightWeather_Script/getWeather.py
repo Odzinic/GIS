@@ -1,5 +1,6 @@
 import os
-import urllib2, urllib
+import urllib
+import urllib.request
 import xlwt
 from datetime import  datetime, timedelta
 
@@ -39,7 +40,7 @@ locations = ["Alliston Simcoe South", "Bancroft - Hastings North", "Barrie Simco
              "Renfrew East - Lanark North", "Rockland Prescott and Russell West", "Sarnia Lambton NW", "St. Thomas Elgin",
              "Stratford Perth South", "Strathroy Middlesex West", "Sundridge - Burk's Falls", "Thamesville Kent East",
              "Tobermory - Bruce Penninsula North", "Toronto", "Trenton Hastings West Northumberland East", "Walkerton Bruce East",
-             "Waterloo", "Wiarton Bruce Peninsula South", "Windsor-Essex West", "Woodstock Oxford",
+             "Waterloo", "Wiarton Bruce Peninsula South", "Windsor-Essex West", "Wingham - Huron East", "Woodstock Oxford",
              "York North", "York South"]
 
 url_code = {"Alliston Simcoe South": "so045", 
@@ -125,6 +126,7 @@ url_code = {"Alliston Simcoe South": "so045",
             "Waterloo": "so028",
             "Wiarton Bruce Peninsula South": "so041",
             "Windsor-Essex West": "so001",
+            "Wingham - Huron East": "so025",
             "Woodstock Oxford": "so012",
             "York North": "so038",
             "York South": "so037"}
@@ -167,9 +169,9 @@ dateStyle = xlwt.easyxf(num_format_str='MM/D/YY')
 y_pos = 1
 
 
-proxy_support = urllib2.ProxyHandler({"http":"206.177.43.90:3128"})
-opener = urllib2.build_opener(proxy_support)
-urllib2.install_opener(opener)
+proxy_support = urllib.request.ProxyHandler({"http":"206.177.43.90:3128"})
+opener = urllib.request.build_opener(proxy_support)
+urllib.request.install_opener(opener)
 
 
 
@@ -178,7 +180,7 @@ urllib2.install_opener(opener)
 for loc in locations:
     
     locCode = url_code[loc]
-    sock = urllib2.urlopen("http://www.farmzone.com/sevenday_forecast/{0}".format(locCode))
+    sock = urllib.request.urlopen("http://www.farmzone.com/sevenday_forecast/{0}".format(locCode))
         
     siteHTML = sock.read()
     sock.close()
@@ -186,19 +188,19 @@ for loc in locations:
     save_path = os.path.join(sevenday_bkp, "{0}".format(datetime.now().date()))
     
     if (os.path.exists(save_path)):
-        backup_file = open(os.path.join(save_path, "{0}.html".format(loc)), 'w')
+        backup_file = open(os.path.join(save_path, "{0}.html".format(loc)), 'wb')
         backup_file.write(siteHTML)
         backup_file.close()
         
         
     else:
         os.mkdir(save_path)
-        backup_file = open(os.path.join(save_path, "{0}.html".format(loc)), 'w')
+        backup_file = open(os.path.join(save_path, "{0}.html".format(loc)), 'wb')
         backup_file.write(siteHTML)
         backup_file.close()
         
    
-    print loc   
+    print (loc)   
 #     for url in siteHTML.split("\n"):
 #         counter += 1
 #         if 'daypop' in url:
@@ -214,16 +216,14 @@ for loc in locations:
 #             counter = 0
 #             break
   
-      
-              
-           
-    for url in siteHTML.split("\n"):
+          
+    for url in siteHTML.split(b"\n"):
         counter += 1    
-        if 'High Temperature' in url:
+        if b'High Temperature' in url:
             counter += 1
-            rest = siteHTML.split("\n")[counter:]
+            rest = siteHTML.split(b"\n")[counter:]
             for num in range(6):
-                temp = rest[num].split('<td>')[1][:2]
+                temp = rest[num].split(b'<td>')[1][:2]
                 try:
                     int(temp)
                     temp_array.append(int(temp))
@@ -232,38 +232,38 @@ for loc in locations:
             counter = 0
             break
           
-    for url in siteHTML.split("\n"):
+    for url in siteHTML.split(b"\n"):
         counter += 1    
-        if '<h2 class="alt">Rain</h2>' in url:
+        if b'<h2 class="alt">Rain</h2>' in url:
             counter += 1
-            rest = siteHTML.split("\n")[counter:]
+            rest = siteHTML.split(b"\n")[counter:]
             for num in range(6):
-                temp = rest[num].split('<td>')[1]
-                if (temp == '-</td>\r'):
+                temp = rest[num].split(b'<td>')[1]
+                if (temp == b'-</td>\r'):
                     precip_array.append(0)
                      
-                elif ('less than 1' in temp):
+                elif (b'less than 1' in temp):
                     precip_array.append(1)  
                        
-                elif('close to ' in temp):
+                elif(b'close to ' in temp):
                     try:
                         int(temp[9:11])
                         precip_array.append(int(temp[9:11]))
                     except ValueError:
                         precip_array.append(int(temp[9:10]))
                          
-                elif(len(temp.split('-')) == 2):
+                elif(len(temp.split(b'-')) == 2):
                     try:
-                        int(temp.split('-')[1][:2])
-                        precip_array.append(int(temp.split('-')[1][:2]))
+                        int(temp.split(b'-')[1][:2])
+                        precip_array.append(int(temp.split(b'-')[1][:2]))
                     except ValueError:    
-                        precip_array.append(int(temp.split('-')[1][:1]))
+                        precip_array.append(int(temp.split(b'-')[1][:1]))
                 
                 else:
-                    print "broken", temp      
+                    print ("broken", temp)      
             counter = 0
             break
-        elif(len(siteHTML.split("\n")) == counter):
+        elif(len(siteHTML.split(b"\n")) == counter):
             for num in range(6):
                 precip_array.append(0)
             counter = 0
@@ -274,7 +274,7 @@ for loc in locations:
           
 for loc in locations:
     locCode = url_code[loc]
-    sock = urllib2.urlopen("http://www.farmzone.com/next_twentyfourhours/{0}".format(locCode))
+    sock = urllib.request.urlopen("http://www.farmzone.com/next_twentyfourhours/{0}".format(locCode))
         
     siteHTML = sock.read()
     sock.close()
@@ -282,25 +282,25 @@ for loc in locations:
     save_path = os.path.join(singleday_bkp, "{0}".format(datetime.now().date()))
     
     if (os.path.exists(save_path)):
-        backup_file = open(os.path.join(save_path, "{0}.html".format(loc)), 'w')
+        backup_file = open(os.path.join(save_path, "{0}.html".format(loc)), 'wb')
         backup_file.write(siteHTML)
         backup_file.close()
         
         
     else:
         os.mkdir(save_path)
-        backup_file = open(os.path.join(save_path, "{0}.html".format(loc)), 'w')
+        backup_file = open(os.path.join(save_path, "{0}.html".format(loc)), 'wb')
         backup_file.write(siteHTML)
         backup_file.close()
      
-    print loc
+    print (loc)
        
-    for url in siteHTML.split("\n"):
+    for url in siteHTML.split(b"\n"):
         counter += 1
-        if 'sttemp' in url:
+        if b'sttemp' in url:
             counter += 4
-            rest = siteHTML.split("\n")[counter:]
-            curr_temp = rest[0].split('<td class="temp">')[1][:2]
+            rest = siteHTML.split(b"\n")[counter:]
+            curr_temp = rest[0].split(b'<td class="temp">')[1][:2]
             try:
                 int(curr_temp)
                 currTemp_array.append(int(curr_temp))
@@ -309,36 +309,36 @@ for loc in locations:
             counter = 0
             break
          
-    for url in siteHTML.split("\n"):
+    for url in siteHTML.split(b"\n"):
         counter += 1    
-        if 'stprecip' in url:
+        if b'stprecip' in url:
             counter += 6
-            rest = siteHTML.split("\n")[counter:]
+            rest = siteHTML.split(b"\n")[counter:]
             temp = rest[1]
-            print temp
-            if ('\t-\t' in temp):
+            print (temp)
+            if (b'\t-\t' in temp):
                 currPrecip_array.append(0)
                   
-            elif ('close to 1mm' in temp or 'less than 1mm' in temp):
+            elif (b'close to 1mm' in temp or b'less than 1mm' in temp):
                 currPrecip_array.append(1)  
                     
-            elif('close to' in temp):
+            elif(b'close to' in temp):
                 try:
-                    int(temp[temp.index('to')+2 : temp.index('to')+5])
-                    currPrecip_array.append(int(temp[temp.index('to')+2 : temp.index('to')+5]))
+                    int(temp[temp.index(b'to')+2 : temp.index(b'to')+5])
+                    currPrecip_array.append(int(temp[temp.index(b'to')+2 : temp.index(b'to')+5]))
                 except ValueError:
-                    currPrecip_array.append(int(temp[temp.index('to')+2 : temp.index('to')+4]))
+                    currPrecip_array.append(int(temp[temp.index(b'to')+2 : temp.index(b'to')+4]))
                       
-            elif(len(temp.split('-')) == 2):
+            elif(len(temp.split(b'-')) == 2):
                 try:
-                    int(temp[temp.index('-') + 1: temp.index('-') + 3])
-                    currPrecip_array.append(int(temp[temp.index('-') + 1: temp.index('-') + 3]))
+                    int(temp[temp.index(b'-') + 1: temp.index(b'-') + 3])
+                    currPrecip_array.append(int(temp[temp.index(b'-') + 1: temp.index(b'-') + 3]))
                 except ValueError:    
-                    currPrecip_array.append(int(temp[temp.index('-') + 1: temp.index('-') + 2]))
+                    currPrecip_array.append(int(temp[temp.index(b'-') + 1: temp.index(b'-') + 2]))
                                 
             counter = 0
             break
-        elif(len(siteHTML.split("\n")) == counter):
+        elif(len(siteHTML.split(b"\n")) == counter):
             counter = 0
             currPrecip_array.append(0)
             break
