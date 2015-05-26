@@ -6,31 +6,38 @@ arcpy.env.overwriteOutput = True
 # Check out the ArcGIS Spatial Analyst extension license
 arcpy.CheckOutExtension("Spatial")
 
-# Script arguments
-# inputWS = arcpy.GetParameterAsText(0)
-# maskShp = arcpy.GetParameterAsText(1)
-# namefield = arcpy.GetParameterAsText(2)
-# outputWS = arcpy.GetParameterAsText(3)
+#  Script arguments
+inRaster = arcpy.GetParameterAsText(0)
+maskShp = arcpy.GetParameterAsText(1)
+nameField = arcpy.GetParameterAsText(2)
+outputWS = arcpy.GetParameterAsText(3)
 #filetype = arcpy.GetParameterAsText(2)
 
-main = os.getcwd()
-inputWS = os.path.join(main, "input")
-inRaster = os.path.join(inputWS, "Untitled.tif")
-maskShp = os.path.join(inputWS, "sample_field.shp")
-namefield = "T_ID"
-outputWS = os.path.join(main, "out")
+# main = os.getcwd()
+# inputWS = os.path.join(main, "input")
+# inRaster = os.path.join(inputWS, "Untitled.tif")
+# maskShp = os.path.join(inputWS, "sample_field.shp")
+# nameField = "T_ID"
+# outputWS = os.path.join(main, "out")
 
 
 # Constants
-inputs = os.listdir(inputWS)
+# inputs = os.listdir(inputWS)
 maskFldr = os.path.join(outputWS, "masks")
 blockSizes = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25]
 
+for field in arcpy.ListFields(maskShp):
+    if (field.name == nameField):
+        if not(field.type == 'String'):
+            print "work"
+            arcpy.AddField_management(maskShp, "T_ID", "TEXT")
+            arcpy.CalculateField_management(maskShp, "T_ID", "!{0}!".format(nameField), "PYTHON")
+            nameField = "T_ID"
+
 if (not os.path.exists(maskFldr)):
     os.mkdir(maskFldr)
-    #
     
-arcpy.Split_analysis(maskShp, maskShp, namefield, maskFldr)
+arcpy.Split_analysis(maskShp, maskShp, nameField, maskFldr)
 masks = filter((lambda x: x.endswith(".shp")), os.listdir(maskFldr))
 
 for mask in masks:
