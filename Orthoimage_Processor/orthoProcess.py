@@ -28,6 +28,7 @@ blockSizes = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25]
 
 if (not os.path.exists(maskFldr)):
     os.mkdir(maskFldr)
+    #
     
 arcpy.Split_analysis(maskShp, maskShp, namefield, maskFldr)
 masks = filter((lambda x: x.endswith(".shp")), os.listdir(maskFldr))
