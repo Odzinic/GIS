@@ -11,56 +11,74 @@ inRaster = arcpy.GetParameterAsText(0)
 maskShp = arcpy.GetParameterAsText(1)
 nameField = arcpy.GetParameterAsText(2)
 outputWS = arcpy.GetParameterAsText(3)
-#filetype = arcpy.GetParameterAsText(2)
-
-# main = os.getcwd()
-# inputWS = os.path.join(main, "input")
-# inRaster = os.path.join(inputWS, "Untitled.tif")
-# maskShp = os.path.join(inputWS, "sample_field.shp")
-# nameField = "T_ID"
-# outputWS = os.path.join(main, "out")
+classesNum = arcpy.GetParameter(4)
+resampleSizes = arcpy.GetParameter(5)
+# arcpy.AddMessage(classesNum)
+# arcpy.AddMessage(type(classesNum))
 
 
 # Constants
-# inputs = os.listdir(inputWS)
 maskFldr = os.path.join(outputWS, "masks")
-blockSizes = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25]
+blockSizes = []
+# blockSizes = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25]
+checkMask = True
 
-for field in arcpy.ListFields(maskShp):
-    if (field.name == nameField):
-        if not(field.type == 'String'):
-            print "work"
-            arcpy.AddField_management(maskShp, "T_ID", "TEXT")
-            arcpy.CalculateField_management(maskShp, "T_ID", "!{0}!".format(nameField), "PYTHON")
-            nameField = "T_ID"
+for num in resampleSizes.split(','):
+    blockSizes.append(int(num))
 
-if (not os.path.exists(maskFldr)):
-    os.mkdir(maskFldr)
+if (maskShp != ""):
+    for field in arcpy.ListFields(maskShp):
+        if (field.name == nameField):
+            if not(field.type == 'String'):
+                arcpy.AddField_management(maskShp, "T_ID", "TEXT")
+                arcpy.CalculateField_management(maskShp, "T_ID", "!{0}!".format(nameField), "PYTHON")
+                nameField = "T_ID"
+                
+if (maskShp != ""):
+    if (not os.path.exists(maskFldr)):
+        os.mkdir(maskFldr)
+        
+    arcpy.Split_analysis(maskShp, maskShp, nameField, maskFldr)
+    masks = filter((lambda x: x.endswith(".shp")), os.listdir(maskFldr))
     
-arcpy.Split_analysis(maskShp, maskShp, nameField, maskFldr)
-masks = filter((lambda x: x.endswith(".shp")), os.listdir(maskFldr))
+elif (maskShp == ""):
+    masks = ['0.']
+    checkMask = False
 
 for mask in masks:
-    currMask = os.path.join(maskFldr, "{0}.shp".format(mask))
+    currMask = os.path.join(maskFldr, "{0}.shp".format(mask.split('.')[0]))
     plotDir = os.path.join(outputWS, "Plot {0}".format(mask.split('.')[0]))
+    rasMask = os.path.join(maskFldr, "{0}.tif".format(mask.split('.')[0]))
     focalDir = os.path.join(plotDir, "focal statistics")
     blockDir = os.path.join(plotDir, "block statistics")
     resampDir = os.path.join(plotDir, "resample")
     clipRaster = os.path.join(plotDir, "clipped_raster.tif")
     convertDir = os.path.join(plotDir, "convert")
+    classifDir = os.path.join(plotDir, "classification")
     os.mkdir(plotDir)
     os.mkdir(focalDir)
     os.mkdir(blockDir)
     os.mkdir(resampDir)
+    os.mkdir(classifDir)
     os.mkdir(convertDir)
     
-    arcsa.ExtractByMask(inRaster, currMask).save(clipRaster)
-    arcpy.RasterToOtherFormat_conversion(clipRaster, convertDir, "GRID")
-    
+    if (checkMask):
+        arcpy.PolygonToRaster_conversion(currMask, nameField, rasMask)
+#         arcsa.ExtractByMask(inRaster, rasMask).save(clipRaster)
+        arcpy.Clip_management(inRaster, "", clipRaster, currMask, 0, "ClippingGeometry", "MAINTAIN_EXTENT")
+        arcpy.RasterToOtherFormat_conversion(clipRaster, convertDir, "GRID")
+        
+    else:
+        arcpy.Raster(inRaster).save(clipRaster)
+        arcpy.RasterToOtherFormat_conversion(clipRaster, convertDir, "GRID")
+        
     for size in blockSizes:
         focalsizeDir = os.path.join(focalDir, "{0}_by_{0}".format(size))
         blocksizeDir = os.path.join(blockDir, "{0}_by_{0}".format(size))
         resampsizeDir = os.path.join(resampDir, "{0}_by_{0}".format(size))
+        classsizeDir = os.path.join(classifDir, "{0}_by_{0}".format(size))
+        classifOut = os.path.join(classsizeDir, "Plot{0}_class".format(mask.split('.')[0]))
+        polyclassOut = os.path.join(classsizeDir, "Plot{0}_class_poly.shp".format(mask.split('.')[0]))
         
         band1 = os.path.join(convertDir, "clipped_c1")
         band2 = os.path.join(convertDir, "clipped_c2")
@@ -81,6 +99,7 @@ for mask in masks:
         os.mkdir(focalsizeDir)
         os.mkdir(blocksizeDir)
         os.mkdir(resampsizeDir)
+        os.mkdir(classsizeDir)
         
         nbr = arcsa.NbrRectangle(size, size, "CELL")
         arcsa.FocalStatistics(band1, nbr, "MEAN", "DATA").save(focalBand1)
@@ -96,5 +115,8 @@ for mask in masks:
         arcpy.Resample_management(blockBand1, resampBand1, "2", "BILINEAR")
         arcpy.Resample_management(blockBand2, resampBand2, "2", "BILINEAR")
         arcpy.Resample_management(blockBand3, resampBand3, "2", "BILINEAR")
-    
+        
+        
+        arcsa.IsoClusterUnsupervisedClassification([resampBand1, resampBand2, resampBand3], classesNum, 10, 5).save(classifOut)
+        arcpy.RasterToPolygon_conversion(classifOut, polyclassOut)
     
