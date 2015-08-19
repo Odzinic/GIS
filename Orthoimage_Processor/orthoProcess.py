@@ -7,12 +7,14 @@ arcpy.env.overwriteOutput = True
 arcpy.CheckOutExtension("Spatial")
 
 #  Script arguments
-inRaster = arcpy.GetParameterAsText(0)
-maskShp = arcpy.GetParameterAsText(1)
-nameField = arcpy.GetParameterAsText(2)
-outputWS = arcpy.GetParameterAsText(3)
-classesNum = arcpy.GetParameter(4)
+inRaster = arcpy.GetParameterAsText(0)                                                          # Input raster
+maskShp = arcpy.GetParameterAsText(1)                                                           # Input mask shapefile        
+nameField = arcpy.GetParameterAsText(2)                                                         # Field from the mask that will be used to name the different study areas
+outputWS = arcpy.GetParameterAsText(3)                                                          # Output folder
+classesNum = arcpy.GetParameter(4)                                                              # 
 resampleSizes = arcpy.GetParameter(5)
+classSize = arcpy.GetParameter(6)
+sampleInterval = arcpy.GetParameter(7)
 # arcpy.AddMessage(classesNum)
 # arcpy.AddMessage(type(classesNum))
 
@@ -55,12 +57,19 @@ for mask in masks:
     clipRaster = os.path.join(plotDir, "clipped_raster.tif")
     convertDir = os.path.join(plotDir, "convert")
     classifDir = os.path.join(plotDir, "classification")
-    os.mkdir(plotDir)
-    os.mkdir(focalDir)
-    os.mkdir(blockDir)
-    os.mkdir(resampDir)
-    os.mkdir(classifDir)
-    os.mkdir(convertDir)
+    
+    if(not os.path.exists(plotDir)):
+        os.mkdir(plotDir)
+    if(not os.path.exists(focalDir)):
+        os.mkdir(focalDir)
+    if(not os.path.exists(blockDir)):
+        os.mkdir(blockDir)
+    if(not os.path.exists(resampDir)):
+        os.mkdir(resampDir)
+    if(not os.path.exists(classifDir)):
+        os.mkdir(classifDir)
+    if(not os.path.exists(convertDir)):
+        os.mkdir(convertDir)
     
     if (checkMask):
         arcpy.PolygonToRaster_conversion(currMask, nameField, rasMask)
@@ -117,6 +126,6 @@ for mask in masks:
         arcpy.Resample_management(blockBand3, resampBand3, "2", "BILINEAR")
         
         
-        arcsa.IsoClusterUnsupervisedClassification([resampBand1, resampBand2, resampBand3], classesNum, 10, 5).save(classifOut)
+        arcsa.IsoClusterUnsupervisedClassification([resampBand1, resampBand2, resampBand3], classesNum, classSize, sampleInterval).save(classifOut)
         arcpy.RasterToPolygon_conversion(classifOut, polyclassOut)
     
