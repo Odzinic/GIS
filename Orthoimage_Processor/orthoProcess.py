@@ -6,28 +6,40 @@ arcpy.env.overwriteOutput = True
 # Check out the ArcGIS Spatial Analyst extension license
 arcpy.CheckOutExtension("Spatial")
 
-#  Script arguments
+#  Script parameters
 inRaster = arcpy.GetParameterAsText(0)                                                          # Input raster
 maskShp = arcpy.GetParameterAsText(1)                                                           # Input mask shapefile        
 nameField = arcpy.GetParameterAsText(2)                                                         # Field from the mask that will be used to name the different study areas
 outputWS = arcpy.GetParameterAsText(3)                                                          # Output folder
-classesNum = arcpy.GetParameter(4)                                                              # 
-resampleSizes = arcpy.GetParameter(5)
-classSize = arcpy.GetParameter(6)
-sampleInterval = arcpy.GetParameter(7)
-# arcpy.AddMessage(classesNum)
-# arcpy.AddMessage(type(classesNum))
+classesNum = arcpy.GetParameter(4)                                                              # Number of classes the image will be classified to
+resampleSizes = arcpy.GetParameter(5)                                                           # The resampling sizes that the tool will run (can be a single value or multiple)
+classSize = arcpy.GetParameter(6)                                                               # The minimum number of pixels that a class must have to be a seperate class
+sampleInterval = arcpy.GetParameter(7)                                                          
+
 
 
 # Constants
-maskFldr = os.path.join(outputWS, "masks")
-blockSizes = []
-# blockSizes = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25]
+maskFldr = os.path.join(outputWS, "masks")                                                      # Folder that contains all the extracted masking shapefiles
+blockSizes = []                                                                                 # List that contains all of the inputed resample sizes
 checkMask = True
 
+
+#=============================================
+# Iterates through all of the inputed resample
+# sizes and appends the values to the blockSize
+# list
+#=============================================
 for num in resampleSizes.split(','):
     blockSizes.append(int(num))
 
+
+#=====================================================
+# Condition that checks if a mask was inputed
+# and if true checks that the inputed name field
+# is a string. If false, creates a new string field
+# and copies the name field values as strings into the
+# new field
+#=====================================================
 if (maskShp != ""):
     for field in arcpy.ListFields(maskShp):
         if (field.name == nameField):
@@ -35,29 +47,62 @@ if (maskShp != ""):
                 arcpy.AddField_management(maskShp, "T_ID", "TEXT")
                 arcpy.CalculateField_management(maskShp, "T_ID", "!{0}!".format(nameField), "PYTHON")
                 nameField = "T_ID"
-                
-if (maskShp != ""):
-    if (not os.path.exists(maskFldr)):
-        os.mkdir(maskFldr)
+
+
+
+#=================================================
+# Condition that checks if a mask was inputed
+# and if true checks if a folder to contain the
+# mask fields exist. If false, creates the folder 
+# and stores the masks in the folder
+#=================================================               
+if (maskShp != ""):                                                                             # Check if a mask was inputed
+    if (not os.path.exists(maskFldr)):                                                          # Check if mask folder exists
+        os.mkdir(maskFldr)                                                                      # Creates mask folder if folder doesn't exist
         
-    arcpy.Split_analysis(maskShp, maskShp, nameField, maskFldr)
-    masks = filter((lambda x: x.endswith(".shp")), os.listdir(maskFldr))
-    
+    arcpy.Split_analysis(maskShp, maskShp, nameField, maskFldr)                                 # Splits the mask polygons into separate shapefiles
+    masks = filter((lambda x: x.endswith(".shp")), os.listdir(maskFldr))                        # Creates a list of all of the masks
+
+
+#=============================================
+# Condition that checks if a mask was inputed
+# and if false, skips the masking process  
+#=============================================  
 elif (maskShp == ""):
     masks = ['0.']
-    checkMask = False
-
-for mask in masks:
-    currMask = os.path.join(maskFldr, "{0}.shp".format(mask.split('.')[0]))
-    plotDir = os.path.join(outputWS, "Plot {0}".format(mask.split('.')[0]))
-    rasMask = os.path.join(maskFldr, "{0}.tif".format(mask.split('.')[0]))
-    focalDir = os.path.join(plotDir, "focal statistics")
-    blockDir = os.path.join(plotDir, "block statistics")
-    resampDir = os.path.join(plotDir, "resample")
-    clipRaster = os.path.join(plotDir, "clipped_raster.tif")
-    convertDir = os.path.join(plotDir, "convert")
-    classifDir = os.path.join(plotDir, "classification")
+    checkMask = False                                                                           # Sets the mask check to false which indicates the script
+                                                                                                # will skip the masking process
     
+
+#============================================
+# Iterates through all of the mask shapefiles
+# and runs process with the mask
+#============================================
+for mask in masks:
+    # File input and output paths for the following processes
+    currMask = os.path.join(maskFldr, "{0}.shp".format(mask.split('.')[0]))                     # File path to the current mask
+    plotDir = os.path.join(outputWS, "Plot {0}".format(mask.split('.')[0]))                     # Fle path to the folder that will be creates 
+                                                                                                # for the outputs of the process with current mask
+    rasMask = os.path.join(maskFldr, "{0}.tif".format(mask.split('.')[0]))                      # File path for the output of a raster version of
+                                                                                                # the current mask
+    focalDir = os.path.join(plotDir, "focal statistics")                                        # File path for the folder that will contain the
+                                                                                                # outputs of the Focal Statistics tool
+    blockDir = os.path.join(plotDir, "block statistics")                                        # File path for the folder that will contain the
+                                                                                                # outputs of the Block Statistics tool
+    resampDir = os.path.join(plotDir, "resample")                                               # File path for the folder that will contain the
+                                                                                                # outputs of the Resampling tool
+    clipRaster = os.path.join(plotDir, "clipped_raster.tif")                                    # File path of the output from the masking of the input
+                                                                                                # raster
+    convertDir = os.path.join(plotDir, "convert")                                               # File path for the folder that will contain the extracted
+                                                                                                # bands from the clipped raster
+    classifDir = os.path.join(plotDir, "classification")                                        # File path for the folder that will contain the classified
+                                                                                                # raster
+    
+    
+    #================================================
+    # Conditions that check if required folder exist.
+    # If false, creates the folder
+    #================================================
     if(not os.path.exists(plotDir)):
         os.mkdir(plotDir)
     if(not os.path.exists(focalDir)):
@@ -71,11 +116,13 @@ for mask in masks:
     if(not os.path.exists(convertDir)):
         os.mkdir(convertDir)
     
+    
+    
     if (checkMask):
-        arcpy.PolygonToRaster_conversion(currMask, nameField, rasMask)
-#         arcsa.ExtractByMask(inRaster, rasMask).save(clipRaster)
-        arcpy.Clip_management(inRaster, "", clipRaster, currMask, 0, "ClippingGeometry", "MAINTAIN_EXTENT")
-        arcpy.RasterToOtherFormat_conversion(clipRaster, convertDir, "GRID")
+        arcpy.PolygonToRaster_conversion(currMask, nameField, rasMask)                          # Converts the current mask from a polygon to a raster        
+        arcpy.Clip_management(inRaster, "", clipRaster, currMask, 0, "ClippingGeometry",        # Clips the input raster to the mask extent
+                              "MAINTAIN_EXTENT")
+        arcpy.RasterToOtherFormat_conversion(clipRaster, convertDir, "GRID")                    # Converts the clipped raster to a GRID format
         
     else:
         arcpy.Raster(inRaster).save(clipRaster)
@@ -89,22 +136,28 @@ for mask in masks:
         classifOut = os.path.join(classsizeDir, "Plot{0}_class".format(mask.split('.')[0]))
         polyclassOut = os.path.join(classsizeDir, "Plot{0}_class_poly.shp".format(mask.split('.')[0]))
         
+        
+        # File paths to the extracted raster bands
         band1 = os.path.join(convertDir, "clipped_c1")
         band2 = os.path.join(convertDir, "clipped_c2")
         band3 = os.path.join(convertDir, "clipped_c3")
         
+        # File paths for the results of focal statistics 
         focalBand1 = os.path.join(focalsizeDir, "band_1")
         focalBand2 = os.path.join(focalsizeDir, "band_2")
         focalBand3 = os.path.join(focalsizeDir, "band_3")
         
+        # File paths for the results of block statistics
         blockBand1 = os.path.join(blocksizeDir, "band_1")
         blockBand2 = os.path.join(blocksizeDir, "band_2")
         blockBand3 = os.path.join(blocksizeDir, "band_3")
         
+        # Files paths for the results of resampling
         resampBand1 = os.path.join(resampsizeDir, "band_1")
         resampBand2 = os.path.join(resampsizeDir, "band_2")
         resampBand3 = os.path.join(resampsizeDir, "band_3")
         
+        # Make folders to store the outputs of the processes
         os.mkdir(focalsizeDir)
         os.mkdir(blocksizeDir)
         os.mkdir(resampsizeDir)
