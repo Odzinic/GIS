@@ -2,11 +2,13 @@ import os
 import arcpy
 
 # Input shapefiles to be compared
-liosoilInput = r"J:\LIO_SoilSurveyComplex\LIO_Copy\LIOEditor_SoilSurveyComplex_March42015.shp"
-publicsoilInput = r"J:\LIO_SoilSurveyComplex\Public_Copy\Soil_Survey_Complex.shp"
+# liosoilInput = r"J:\Scripts\GIS\LIO_SoilCompare\LIO-2014-06-20\LIOEditor_SoilSurveyComplex_March42015.shp"
+# publicsoilInput = r"J:\Scripts\GIS\LIO_SoilCompare\LIO-2014-06-20\SOIL_SURVEY_COMPLEX.shp"
 
+liosoilInput = r"J:\Scripts\GIS\LIO_SoilCompare\LIO-2014-06-20\LIOEditor_Point.shp"
+publicsoilInput = r"J:\Scripts\GIS\LIO_SoilCompare\LIO-2014-06-20\SOIL_SURVEY_POINT.shp"
 # Output folder
-outDir = r"J:\LIO_SoilSurveyComplex\output"
+outDir = r"J:\Scripts\GIS\LIO_SoilCompare\output"
 
 # Output File Paths
 diffLayer = os.path.join(outDir, "poly_diff.shp")                                           # Output shapefile that displays polygon differences
@@ -23,31 +25,34 @@ in1 = arcpy.mapping.Layer(liosoilInput)                                         
                                                                                             # attribute queries
 in2 = arcpy.mapping.Layer(publicsoilInput)                                                  # Public shapefile loaded as a layer to allow for location and
                                                                                             # attribute queries
+                                                                                            
+countDict = {}
 
 
 # Parameters for arcpy Feature Compare tool
 ignOptions = 'IGNORE_M;IGNORE_Z;IGNORE_POINTID;IGNORE_EXTENSION_PROPERTIES;IGNORE_SUBTYPES;IGNORE_RELATIONSHIPCLASSES;\
 IGNORE_REPRESENTATIONCLASSES'
-omitOptions = 'FID;Shape;OBJECTID;EDIT_STATE;OGF_ID;Shape_Leng;Area_Acres'
+omitOptions = "FID;Shape;OGF_ID;MAPUNIT;ACRES;HECTARES;ACCURACY;GEO_UPT_DT;EFF_DATE"
 
 
 lioFields = arcpy.ListFields(liosoilInput)
-keepFields = ["Message", "ObjectID_1", "OBJECTID"]
+keepFields = ["Message", "OBJECTID"]
 
 if (not arcpy.Exists(resultDb)):
     arcpy.CreateFileGDB_management(outDir, "results.gdb")
 
-arcpy.SelectLayerByLocation_management(in1, "ARE_IDENTICAL_TO", in2)
-arcpy.SelectLayerByAttribute_management(in1, "SWITCH_SELECTION")
-arcpy.CopyFeatures_management(in1, diffLayer)
- 
-arcpy.FeatureCompare_management(liosoilInput, publicsoilInput, 'Compare', 'ATTRIBUTES_ONLY', ignOptions, "0.000000008983 Unknown", "0.001", "0.001", "", omitOptions, 'CONTINUE_COMPARE', compareTxt)
-arcpy.TableToGeodatabase_conversion(compareTxt, resultDb)
-removeFields = filter(lambda x: x.name not in keepFields, arcpy.ListFields(compareTbl))
-for field in arcpy.ListFields(compareTbl):
-    arcpy.AddMessage(field.name)
-arcpy.AddMessage(removeFields)
 
-
-for field in removeFields:
-    arcpy.DeleteField_management(compareTbl, field.name)
+with arcpy.da.SearchCursor(compareTbl, ['ObjectID_1']) as cursor:
+    for row in cursor:
+        if (countDict.has_key(row[0])):
+            countDict[row[0]] += 1
+        else:
+            countDict[row[0]] = 1
+            
+with arcpy.da.UpdateCursor(publicsoilInput, ['FID', 'DIFF_FIELD']) as cursor:
+    for row in cursor:
+        try:
+            row[1] = countDict[row[0]]
+            cursor.updateRow(row)
+        except KeyError:
+            pass
