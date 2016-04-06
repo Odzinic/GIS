@@ -56,3 +56,6 @@ with arcpy.da.UpdateCursor(publicsoilInput, ['FID', 'DIFF_FIELD']) as cursor:
             cursor.updateRow(row)
         except KeyError:
             pass
+        
+        
+
