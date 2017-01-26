@@ -1,1 +1,1 @@
-# Sentinel Merge
+# Sentinel 2 Merge
