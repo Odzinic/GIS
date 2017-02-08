@@ -1,10 +1,14 @@
 # Sentinel 2 Merge
 
-import gdal
+#import gdal
 import os
 import shutil
 import zipfile
 from sys import argv
+import arcpy
+from arcpy import env
+
+arcpy.env.overwriteOutput = True
 
 inputDir = argv[1]
 outputDir = os.path.join(os.getcwd(), "output")
@@ -47,7 +51,13 @@ for date in imageDates:
 				if (name.endswith('.jp2')):
 					filename = os.path.basename(name)
 					shutil.copyfileobj(zipOpen.open(name), file(os.path.join(dateDir, filename), "wb"))
+					
+					cellSize = int(arcpy.GetRasterProperties_management(os.path.join(dateDir, filename), "CELLSIZEX").getOutput(0))
+					
+					if (cellSize != 10):
+						
+						arcpy.Resample_management(os.path.join(dateDir, filename), os.path.join(dateDir, filename[0:-4]+"_10"+".jp2"), "10 10", "CUBIC")
+						
+					
 
-	
-
-	print zipDate
+			
