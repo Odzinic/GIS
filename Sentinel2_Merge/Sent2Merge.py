@@ -57,6 +57,9 @@ for date in imageDates:
 					if (cellSize != 10):
 						
 						arcpy.Resample_management(os.path.join(dateDir, filename), os.path.join(dateDir, filename[0:-4]+"_10"+".jp2"), "10 10", "CUBIC")
+						os.remove(os.path.join(dateDir, filename))
+
+						print "Removed {0}".format(os.path.join(dateDir, filename))
 						
 					
 
